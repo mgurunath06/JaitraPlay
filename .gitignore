@@ -1,0 +1,42 @@
+
+# Sensitive local files
+
+key/
+JAITRA-SSH.bat
+JaitraPlay-SSH.bat
+
+# Secrets / environment
+
+.env
+.env.*
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+
+# Python
+
+**pycache**/
+*.py[cod]
+.venv/
+.pytest_cache/
+
+# Node / Electron
+
+node_modules/
+dist/
+build/
+coverage/
+
+# VS Code / OS noise
+
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Logs / runtime
+
+*.log
+logs/
+tmp/
