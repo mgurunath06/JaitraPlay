@@ -46,7 +46,7 @@ function createWindow(): BrowserWindow {
     autoHideMenuBar: true,
     show: false,
     webPreferences: {
-      preload: join(directory, "preload.js"),
+      preload: join(directory, "preload.cjs"),
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
