@@ -1,0 +1,15 @@
+[Unit]
+Description=JAITRA Play Authoritative Core (development)
+After=graphical-session.target
+
+[Service]
+Type=simple
+WorkingDirectory=@REPOSITORY_ROOT@
+ExecStart=/bin/bash @REPOSITORY_ROOT@/deploy/scripts/run-core.sh
+Restart=always
+RestartSec=2
+Environment=JAITRA_CONFIG=@REPOSITORY_ROOT@/config.yaml
+Environment=JAITRA_REPOSITORY_ROOT=@REPOSITORY_ROOT@
+
+[Install]
+WantedBy=default.target

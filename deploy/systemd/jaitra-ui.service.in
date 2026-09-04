@@ -1,0 +1,14 @@
+[Unit]
+Description=JAITRA Play Fullscreen Child UI (development)
+After=graphical-session.target
+
+[Service]
+Type=simple
+WorkingDirectory=@REPOSITORY_ROOT@
+ExecStart=/bin/bash @REPOSITORY_ROOT@/deploy/scripts/run-ui.sh
+Restart=always
+RestartSec=2
+Environment=JAITRA_CORE_URL=http://127.0.0.1:8765
+
+[Install]
+WantedBy=default.target
