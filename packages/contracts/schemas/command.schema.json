@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://jaitra.local/contracts/command.schema.json",
+  "title": "CommandEnvelope",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "requestId", "type", "payload"],
+  "properties": {
+    "apiVersion": { "const": "1.0" },
+    "requestId": { "type": "string", "format": "uuid" },
+    "sessionId": { "type": ["string", "null"], "format": "uuid" },
+    "type": { "enum": ["BEGIN_INTERACTION", "WELCOME_COMPLETE"] },
+    "payload": { "type": "object" }
+  }
+}

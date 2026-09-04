@@ -1,0 +1,57 @@
+from pathlib import Path
+from uuid import uuid4
+
+import anyio
+from httpx import ASGITransport, AsyncClient
+from jaitra_core.api.app import create_app
+from jaitra_core.config import AppConfig
+from jaitra_core.runtime import CoreRuntime
+
+
+def test_api_boot_and_idempotent_commands(config: AppConfig, repository_root: Path) -> None:
+    runtime = CoreRuntime(config, repository_root=repository_root)
+    runtime.start()
+
+    async def exercise_api() -> None:
+        transport = ASGITransport(app=create_app(runtime, manage_lifecycle=False))
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            health = await client.get("/api/v1/health")
+            assert health.status_code == 200
+            assert health.json()["ready"] is True
+
+            snapshot = (await client.get("/api/v1/snapshot")).json()
+            assert snapshot["payload"]["appState"] == "IDLE"
+            assert snapshot["payload"]["capabilities"] == {
+                "voice": "DISABLED",
+                "camera": "DISABLED",
+            }
+
+            request_id = str(uuid4())
+            command = {
+                "apiVersion": "1.0",
+                "requestId": request_id,
+                "type": "BEGIN_INTERACTION",
+                "payload": {},
+            }
+            first = await client.post("/api/v1/commands", json=command)
+            second = await client.post("/api/v1/commands", json=command)
+            assert first.status_code == 200
+            assert second.json() == first.json()
+            assert runtime.state_machine.state == "WELCOME"
+
+    try:
+        anyio.run(exercise_api)
+    finally:
+        runtime.stop()
+
+
+def test_websocket_route_and_snapshot_contract(config: AppConfig, repository_root: Path) -> None:
+    runtime = CoreRuntime(config, repository_root=repository_root)
+    runtime.start()
+    try:
+        app = create_app(runtime, manage_lifecycle=False)
+        assert any(getattr(route, "path", None) == "/api/v1/events" for route in app.routes)
+        snapshot = runtime.snapshot().model_dump(mode="json", by_alias=True)
+        assert snapshot["type"] == "STATE_SNAPSHOT"
+    finally:
+        runtime.stop()
