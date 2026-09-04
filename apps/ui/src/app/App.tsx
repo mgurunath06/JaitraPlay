@@ -3,6 +3,7 @@ import type { StateSnapshot } from "../../../../packages/contracts/src";
 import { Companion } from "../components/Companion";
 import { Hub } from "../states/Hub";
 import { Recovery } from "../states/Recovery";
+import { coreClient } from "./coreClient";
 
 const RETRY_MILLISECONDS = 2000;
 
@@ -12,7 +13,7 @@ export function App() {
 
   const refresh = useCallback(async () => {
     try {
-      const next = await window.jaitra.getSnapshot();
+      const next = await coreClient.getSnapshot();
       setSnapshot(next);
       setRecovering(false);
     } catch {
@@ -28,7 +29,7 @@ export function App() {
 
   const command = async (type: "BEGIN_INTERACTION" | "WELCOME_COMPLETE") => {
     try {
-      await window.jaitra.sendCommand(type);
+      await coreClient.sendCommand(type);
       await refresh();
     } catch {
       setRecovering(true);

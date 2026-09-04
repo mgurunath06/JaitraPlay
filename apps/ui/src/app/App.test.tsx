@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
 
 const idleSnapshot = {
@@ -23,6 +23,12 @@ describe("child shell", () => {
     };
   });
 
+  afterEach(() => {
+    delete window.jaitra;
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
+  });
+
   it("renders the authoritative idle snapshot", async () => {
     render(<App />);
     expect(screen.getByRole("status")).toHaveTextContent("waking up");
@@ -36,13 +42,25 @@ describe("child shell", () => {
     await act(async () => Promise.resolve());
     fireEvent.click(screen.getByRole("button", { name: "Let’s play" }));
     await act(async () => Promise.resolve());
-    expect(window.jaitra.sendCommand).toHaveBeenCalledWith("BEGIN_INTERACTION");
+    expect(window.jaitra?.sendCommand).toHaveBeenCalledWith("BEGIN_INTERACTION");
   });
 
   it("shows branded recovery when core is unavailable", async () => {
-    window.jaitra.getSnapshot = vi.fn().mockRejectedValue(new Error("offline"));
+    window.jaitra!.getSnapshot = vi.fn().mockRejectedValue(new Error("offline"));
     render(<App />);
     await act(async () => Promise.resolve());
     expect(screen.getByRole("status")).toHaveTextContent("tiny moment");
+  });
+
+  it("uses the Vite proxy when viewed in a WSL development browser", async () => {
+    delete window.jaitra;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({ ok: true, json: async () => idleSnapshot }),
+    );
+    render(<App />);
+    await act(async () => Promise.resolve());
+    expect(screen.getByRole("heading", { name: "Ready to play?" })).toBeVisible();
+    expect(fetch).toHaveBeenCalledWith("/api/v1/snapshot", { cache: "no-store" });
   });
 });
