@@ -8,10 +8,8 @@ const coreUrl = process.env.JAITRA_CORE_URL ?? "http://127.0.0.1:8765";
 const developmentUrl = process.env.JAITRA_UI_DEV_URL;
 let mainWindow: BrowserWindow | null = null;
 
-if (process.platform === "linux" && process.env.WAYLAND_DISPLAY) {
-  app.commandLine.appendSwitch("ozone-platform", "wayland");
-  app.commandLine.appendSwitch("enable-features", "WaylandWindowDecorations");
-}
+const isWsl = process.platform === "linux" && Boolean(process.env.WSL_DISTRO_NAME);
+if (isWsl) app.disableHardwareAcceleration();
 
 function coreEndpoint(path: string): string {
   const url = new URL(path, coreUrl);
@@ -90,7 +88,6 @@ function createWindow(): BrowserWindow {
     window.center();
     window.show();
     window.focus();
-    window.moveTop();
   }
   return window;
 }
