@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 const directory = fileURLToPath(new URL(".", import.meta.url));
 const coreUrl = process.env.JAITRA_CORE_URL ?? "http://127.0.0.1:8765";
 const developmentUrl = process.env.JAITRA_UI_DEV_URL;
+let mainWindow: BrowserWindow | null = null;
 
 function coreEndpoint(path: string): string {
   const url = new URL(path, coreUrl);
@@ -44,7 +45,7 @@ function createWindow(): BrowserWindow {
     fullscreen: !developmentUrl,
     kiosk: !developmentUrl,
     autoHideMenuBar: true,
-    show: false,
+    show: Boolean(developmentUrl),
     webPreferences: {
       preload: join(directory, "preload.cjs"),
       contextIsolation: true,
@@ -62,6 +63,9 @@ function createWindow(): BrowserWindow {
     if (!developmentUrl && blocked) event.preventDefault();
   });
   window.once("ready-to-show", () => window.show());
+  window.on("closed", () => {
+    mainWindow = null;
+  });
 
   if (developmentUrl) void window.loadURL(developmentUrl);
   else void window.loadFile(join(directory, "../dist/ui/index.html"));
@@ -72,7 +76,11 @@ app.whenReady().then(() => {
   session.defaultSession.setPermissionRequestHandler((_contents, _permission, callback) => callback(false));
   session.defaultSession.setPermissionCheckHandler(() => false);
   installIpcHandlers();
-  createWindow();
+  mainWindow = createWindow();
+});
+
+app.on("activate", () => {
+  if (mainWindow === null) mainWindow = createWindow();
 });
 
 app.on("window-all-closed", () => app.quit());
