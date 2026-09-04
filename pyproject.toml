@@ -1,0 +1,49 @@
+[project]
+name = "jaitra-play-core"
+version = "0.1.0"
+description = "Authoritative local core for JAITRA Play"
+requires-python = ">=3.12"
+dependencies = [
+  "fastapi>=0.116,<1",
+  "pydantic>=2.11,<3",
+  "PyYAML>=6.0,<7",
+  "uvicorn[standard]>=0.35,<1",
+]
+
+[project.scripts]
+jaitra-core = "jaitra_core.main:run"
+jaitra-content = "jaitra_core.content.cli:main"
+
+[dependency-groups]
+dev = [
+  "httpx>=0.28,<1",
+  "mypy>=1.17,<2",
+  "pytest>=8.4,<9",
+  "pytest-cov>=6.2,<7",
+  "ruff>=0.12,<1",
+  "types-PyYAML>=6.0,<7",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["apps/core/jaitra_core"]
+
+[tool.pytest.ini_options]
+testpaths = ["apps/core/tests", "tests"]
+addopts = "--strict-markers --disable-warnings"
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+packages = ["jaitra_core"]
+mypy_path = "apps/core"

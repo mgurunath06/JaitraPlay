@@ -1,0 +1,32 @@
+schema_version: 1
+child:
+  display_name: "JAITRA"
+companion:
+  name: "Mimo"
+ui:
+  max_hub_choices: 4
+  inactivity_seconds: 300
+  pointer_visible: true
+activities:
+  enabled:
+    - picture_guess
+  difficulty: easy
+rewards:
+  first_try_stars: 3
+  after_hint_stars: 2
+  assisted_stars: 1
+  delight_probability: 0.15
+limits:
+  max_software_volume: 0.65
+  session_minutes: null
+  video_minutes: null
+logging:
+  level: INFO
+  retention_days: 14
+server:
+  host: 127.0.0.1
+  port: 8765
+paths:
+  state_dir: .local/state
+  content_dir: content/packs
+  migrations_dir: migrations

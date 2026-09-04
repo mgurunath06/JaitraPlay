@@ -40,3 +40,8 @@ Thumbs.db
 *.log
 logs/
 tmp/
+
+# JAITRA Play local runtime
+
+config.yaml
+.local/
