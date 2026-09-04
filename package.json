@@ -6,7 +6,7 @@
   "main": "dist-electron/main.js",
   "scripts": {
     "dev": "vite --config apps/ui/vite.config.ts",
-    "electron:dev": "npm run electron:build && JAITRA_UI_DEV_URL=http://127.0.0.1:5173 electron .",
+    "electron:dev": "npm run electron:build && env -u ELECTRON_RUN_AS_NODE JAITRA_UI_DEV_URL=http://127.0.0.1:5173 electron .",
     "electron:build": "tsc -p apps/ui/electron/tsconfig.json",
     "build": "npm run electron:build && tsc -b apps/ui/tsconfig.json && vite build --config apps/ui/vite.config.ts",
     "test": "vitest run --config apps/ui/vite.config.ts",

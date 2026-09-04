@@ -29,9 +29,9 @@ deploy/scripts/smoke-core.sh
 
 ### VS Code shortcut
 
-Press `Ctrl+Shift+B` and choose **JAITRA Play: Run all** if VS Code asks. It is the default build task and starts Core, Vite, and the child screen. Under WSL it opens the screen in the Windows browser after Vite reports that port 5173 is ready; on native Ubuntu it launches Electron. If `config.yaml` is missing, the Core task creates it from the checked-in example.
+Press `Ctrl+Shift+B` and choose **JAITRA Play: Run all** if VS Code asks. It is the default build task and starts Core, Vite, and Electron in three grouped terminal panes. Electron waits for Vite to report that port 5173 is ready. The task removes VS Code's inherited `ELECTRON_RUN_AS_NODE` variable so Electron launches as a thick client. If `config.yaml` is missing, the Core task creates it from the checked-in example.
 
-Browser rendering is development-only and reaches the core through Vite's loopback proxy. Production and appliance builds continue to require the sandboxed Electron preload bridge.
+Opening port 5173 in a browser remains an optional development fallback. Production and appliance builds require the sandboxed Electron preload bridge.
 
 To stop everything, use **Terminal: Terminate All Tasks** from the Command Palette (`Ctrl+Shift+P`).
 

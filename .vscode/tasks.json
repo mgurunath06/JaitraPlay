@@ -74,9 +74,9 @@
       }
     },
     {
-      "label": "JAITRA: Screen",
+      "label": "JAITRA: Electron",
       "type": "shell",
-      "command": "if [ -n \"$WSL_DISTRO_NAME\" ]; then /mnt/c/Windows/System32/cmd.exe /C start \"\" http://127.0.0.1:5173; else source \"$HOME/.nvm/nvm.sh\" && exec npm run electron:dev; fi",
+      "command": "source \"$HOME/.nvm/nvm.sh\" && unset ELECTRON_RUN_AS_NODE && exec npm run electron:dev",
       "options": {
         "cwd": "${workspaceFolder}",
         "shell": {
@@ -100,7 +100,7 @@
     },
     {
       "label": "JAITRA Play: Run all",
-      "dependsOn": ["JAITRA: Core", "JAITRA: Screen"],
+      "dependsOn": ["JAITRA: Core", "JAITRA: Electron"],
       "dependsOrder": "parallel",
       "problemMatcher": [],
       "group": {
