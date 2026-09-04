@@ -8,6 +8,11 @@ const coreUrl = process.env.JAITRA_CORE_URL ?? "http://127.0.0.1:8765";
 const developmentUrl = process.env.JAITRA_UI_DEV_URL;
 let mainWindow: BrowserWindow | null = null;
 
+if (process.platform === "linux" && process.env.WAYLAND_DISPLAY) {
+  app.commandLine.appendSwitch("ozone-platform", "wayland");
+  app.commandLine.appendSwitch("enable-features", "WaylandWindowDecorations");
+}
+
 function coreEndpoint(path: string): string {
   const url = new URL(path, coreUrl);
   if (!['127.0.0.1', 'localhost', '::1'].includes(url.hostname)) {
@@ -41,6 +46,11 @@ function installIpcHandlers(): void {
 
 function createWindow(): BrowserWindow {
   const window = new BrowserWindow({
+    title: "JAITRA Play",
+    width: 1280,
+    height: 720,
+    minWidth: 960,
+    minHeight: 540,
     backgroundColor: "#10253f",
     fullscreen: !developmentUrl,
     kiosk: !developmentUrl,
@@ -58,6 +68,12 @@ function createWindow(): BrowserWindow {
 
   window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
   window.webContents.on("will-navigate", (event) => event.preventDefault());
+  window.webContents.on("preload-error", (_event, preloadPath, error) => {
+    console.error(`JAITRA preload failed (${preloadPath}):`, error);
+  });
+  window.webContents.on("did-fail-load", (_event, code, description) => {
+    console.error(`JAITRA renderer failed to load (${code}): ${description}`);
+  });
   window.webContents.on("before-input-event", (event, input) => {
     const blocked = input.key === "F12" || (input.control && input.shift && ["I", "J", "C"].includes(input.key));
     if (!developmentUrl && blocked) event.preventDefault();
@@ -69,6 +85,13 @@ function createWindow(): BrowserWindow {
 
   if (developmentUrl) void window.loadURL(developmentUrl);
   else void window.loadFile(join(directory, "../dist/ui/index.html"));
+
+  if (developmentUrl) {
+    window.center();
+    window.show();
+    window.focus();
+    window.moveTop();
+  }
   return window;
 }
 
