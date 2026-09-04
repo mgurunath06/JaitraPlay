@@ -12,6 +12,8 @@ from jaitra_core.api.models import (
     CommandResult,
     ErrorDetail,
     ErrorEnvelope,
+    GeneratedQuestion,
+    QuestionRequest,
     SnapshotPayload,
     StateSnapshot,
 )
@@ -19,9 +21,37 @@ from jaitra_core.config import AppConfig
 from jaitra_core.content import ContentCatalog
 from jaitra_core.observability import ComponentHealth, HealthModel, HealthState, log_event
 from jaitra_core.persistence import Database
+from jaitra_core.providers import AiQuestionService
 from jaitra_core.state import StateMachine, TransitionError
 
 logger = logging.getLogger(__name__)
+
+APP_CATALOG = (
+    {
+        "activity_id": "picture_guess",
+        "title": "Picture Guess",
+        "description": "Spot the animal that Mimo asks for.",
+        "icon": "🐘",
+    },
+    {
+        "activity_id": "colours_shapes",
+        "title": "Colour Quest",
+        "description": "Explore bright colours and playful shapes.",
+        "icon": "🎨",
+    },
+    {
+        "activity_id": "memory_cards",
+        "title": "Memory Match",
+        "description": "Turn over cards and find every pair.",
+        "icon": "🧠",
+    },
+    {
+        "activity_id": "riddle_guess",
+        "title": "Riddle Garden",
+        "description": "Listen to clues and discover the answer.",
+        "icon": "🌱",
+    },
+)
 
 
 class CoreRuntime:
@@ -35,6 +65,7 @@ class CoreRuntime:
             state_dir / "jaitra.db", self._resolve(config.paths.migrations_dir)
         )
         self.catalog = ContentCatalog(self._resolve(config.paths.content_dir))
+        self.questions = AiQuestionService(repository_root)
         self.enabled_activities: list[str] = []
 
     def start(self) -> None:
@@ -75,13 +106,6 @@ class CoreRuntime:
         self.database.close()
 
     def snapshot(self) -> StateSnapshot:
-        titles = {
-            "picture_guess": "Picture Guess",
-            "colours_shapes": "Colours & Shapes",
-            "memory_cards": "Memory Cards",
-            "riddle_guess": "Riddle Guess",
-            "what_comes_next": "What Comes Next?",
-        }
         return StateSnapshot(
             payload=SnapshotPayload(
                 appState=self.state_machine.state,
@@ -89,11 +113,31 @@ class CoreRuntime:
                 companionName=self.config.companion.name,
                 capabilities=CapabilitySnapshot(),
                 activities=[
-                    ActivityDescriptor(activityId=item, title=titles.get(item, item))
-                    for item in self.enabled_activities[: self.config.ui.max_hub_choices]
+                    ActivityDescriptor(
+                        activityId=item["activity_id"],
+                        title=item["title"],
+                        description=item["description"],
+                        icon=item["icon"],
+                        availability="AVAILABLE",
+                    )
+                    for item in APP_CATALOG[: self.config.ui.max_hub_choices]
                 ],
             )
         )
+
+    async def generate_question(
+        self, activity_id: str, request: QuestionRequest
+    ) -> GeneratedQuestion:
+        adapted = request
+        if request.previous_prompt and request.needed_hint:
+            self.database.record_hint_used(activity_id, request.previous_prompt)
+        elif request.previous_prompt is None:
+            previous_hint = self.database.last_hint_prompt(activity_id)
+            if previous_hint:
+                adapted = request.model_copy(
+                    update={"previous_prompt": previous_hint, "needed_hint": True}
+                )
+        return await self.questions.generate(activity_id, adapted)
 
     def dispatch(self, command: CommandEnvelope) -> CommandResult | ErrorEnvelope:
         connection = self.database.connection

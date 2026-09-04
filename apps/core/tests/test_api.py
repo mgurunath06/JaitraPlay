@@ -4,6 +4,7 @@ from uuid import uuid4
 import anyio
 from httpx import ASGITransport, AsyncClient
 from jaitra_core.api.app import create_app
+from jaitra_core.api.models import GeneratedQuestion, QuestionChoice
 from jaitra_core.config import AppConfig
 from jaitra_core.runtime import CoreRuntime
 
@@ -25,6 +26,10 @@ def test_api_boot_and_idempotent_commands(config: AppConfig, repository_root: Pa
                 "voice": "DISABLED",
                 "camera": "DISABLED",
             }
+            assert len(snapshot["payload"]["activities"]) == 4
+            assert snapshot["payload"]["activities"][0]["activityId"] == "picture_guess"
+            assert snapshot["payload"]["activities"][0]["availability"] == "AVAILABLE"
+            assert snapshot["payload"]["activities"][1]["availability"] == "AVAILABLE"
 
             request_id = str(uuid4())
             command = {
@@ -53,5 +58,44 @@ def test_websocket_route_and_snapshot_contract(config: AppConfig, repository_roo
         assert any(getattr(route, "path", None) == "/api/v1/events" for route in app.routes)
         snapshot = runtime.snapshot().model_dump(mode="json", by_alias=True)
         assert snapshot["type"] == "STATE_SNAPSHOT"
+    finally:
+        runtime.stop()
+
+
+def test_ai_question_route(config: AppConfig, repository_root: Path) -> None:
+    runtime = CoreRuntime(config, repository_root=repository_root)
+    runtime.start()
+
+    async def fake_generate(activity_id: str, _request: object) -> GeneratedQuestion:
+        return GeneratedQuestion(
+            activityId=activity_id,
+            prompt="Find the elephant.",
+            hint="It has a trunk.",
+            choices=[
+                QuestionChoice(value="elephant", label="🐘"),
+                QuestionChoice(value="lion", label="🦁"),
+                QuestionChoice(value="dog", label="🐶"),
+                QuestionChoice(value="cat", label="🐱"),
+            ],
+            answer="elephant",
+            explanation="That is the elephant.",
+            provider="mwapi",
+        )
+
+    runtime.questions.generate = fake_generate  # type: ignore[method-assign]
+
+    async def exercise_api() -> None:
+        transport = ASGITransport(app=create_app(runtime, manage_lifecycle=False))
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            response = await client.post(
+                "/api/v1/activities/picture_guess/question",
+                json={"previousPrompt": None, "neededHint": False, "recentPrompts": []},
+            )
+            assert response.status_code == 200
+            assert response.json()["answer"] == "elephant"
+            assert response.json()["provider"] == "mwapi"
+
+    try:
+        anyio.run(exercise_api)
     finally:
         runtime.stop()

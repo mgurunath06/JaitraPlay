@@ -41,7 +41,7 @@ export function App() {
 
   const { appState, childDisplayName, companionName, activities } = snapshot.payload;
   return (
-    <main className="stage">
+    <main className={`stage ${appState === "HUB" ? "stage-hub" : ""}`}>
       <Companion name={companionName} />
       {appState === "IDLE" && (
         <section className="panel" aria-labelledby="welcome-title">

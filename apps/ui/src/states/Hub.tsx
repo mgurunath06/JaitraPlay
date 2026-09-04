@@ -1,21 +1,55 @@
-interface Activity {
+import { useState } from "react";
+import { PlayApp, type PlayableActivity } from "./PlayApp";
+
+interface Activity extends PlayableActivity {
   activityId: string;
   title: string;
+  description: string;
+  icon: string;
+  availability: "AVAILABLE" | "COMING_SOON";
 }
 
 export function Hub({ activities }: { activities: Activity[] }) {
+  const [selected, setSelected] = useState<Activity | null>(null);
+
+  if (selected) {
+    return <PlayApp activity={selected} onBack={() => setSelected(null)} />;
+  }
+
   return (
     <section className="panel hub" aria-labelledby="games-title">
-      <p className="eyebrow">Pick a picture</p>
-      <h1 id="games-title">What shall we play?</h1>
+      <div className="hub-heading">
+        <div>
+          <p className="eyebrow">Mimo’s playroom</p>
+          <h1 id="games-title">Choose an app</h1>
+        </div>
+        <span className="app-count" aria-label={`${activities.length} apps`}>
+          {activities.length} apps
+        </span>
+      </div>
       <div className="activity-grid">
-        {activities.map((activity) => (
-          <div className="activity-card" key={activity.activityId}>
-            <span className="activity-icon" aria-hidden="true">🐘</span>
-            <span>{activity.title}</span>
-            <small>Coming in the next play build</small>
-          </div>
-        ))}
+        {activities.map((activity, index) => {
+          const available = activity.availability === "AVAILABLE";
+          return (
+            <button
+              className={`activity-card activity-card-${index + 1}`}
+              key={activity.activityId}
+              type="button"
+              disabled={!available}
+              onClick={() => setSelected(activity)}
+              aria-label={`${activity.title}, ${available ? "available" : "coming soon"}`}
+            >
+              <span className="activity-card-top">
+                <span className="activity-icon" aria-hidden="true">{activity.icon}</span>
+                <span className={`availability ${available ? "available" : "soon"}`}>
+                  {available ? "Open" : "Soon"}
+                </span>
+              </span>
+              <span className="activity-title">{activity.title}</span>
+              <span className="activity-description">{activity.description}</span>
+            </button>
+          );
+        })}
       </div>
     </section>
   );

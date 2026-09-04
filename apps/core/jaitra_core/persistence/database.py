@@ -82,6 +82,21 @@ class Database:
         row = self._required_connection().execute("PRAGMA integrity_check").fetchone()
         return bool(row and row[0] == "ok")
 
+    def record_hint_used(self, activity_id: str, prompt: str) -> None:
+        with self.transaction() as connection:
+            connection.execute(
+                "INSERT INTO learning_events(activity_id, prompt, hint_used) VALUES (?, ?, 1)",
+                (activity_id, prompt),
+            )
+
+    def last_hint_prompt(self, activity_id: str) -> str | None:
+        row = self._required_connection().execute(
+            "SELECT prompt FROM learning_events WHERE activity_id = ? "
+            "ORDER BY id DESC LIMIT 1",
+            (activity_id,),
+        ).fetchone()
+        return str(row["prompt"]) if row else None
+
     def _ensure_migration_table(self) -> None:
         connection = self._required_connection()
         connection.execute(

@@ -20,6 +20,28 @@ export interface StateSnapshot {
     childDisplayName: string;
     companionName: string;
     capabilities: { voice: "DISABLED"; camera: "DISABLED" };
-    activities: Array<{ activityId: string; title: string }>;
+    activities: Array<{
+      activityId: string;
+      title: string;
+      description: string;
+      icon: string;
+      availability: "AVAILABLE" | "COMING_SOON";
+    }>;
   };
+}
+
+export interface GeneratedQuestion {
+  activityId: string;
+  prompt: string;
+  hint: string;
+  choices: Array<{ value: string; label: string; color: string | null }>;
+  answer: string;
+  explanation: string;
+  provider: "mwapi" | "openrouter";
+}
+
+export interface QuestionRequest {
+  previousPrompt: string | null;
+  neededHint: boolean;
+  recentPrompts: string[];
 }

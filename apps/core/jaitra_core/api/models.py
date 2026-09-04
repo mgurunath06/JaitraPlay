@@ -23,6 +23,31 @@ class CommandEnvelope(StrictModel):
 class ActivityDescriptor(StrictModel):
     activity_id: str = Field(alias="activityId")
     title: str
+    description: str
+    icon: str
+    availability: Literal["AVAILABLE", "COMING_SOON"]
+
+
+class QuestionRequest(StrictModel):
+    previous_prompt: str | None = Field(default=None, alias="previousPrompt", max_length=200)
+    needed_hint: bool = Field(default=False, alias="neededHint")
+    recent_prompts: list[str] = Field(default=[], alias="recentPrompts", max_length=10)
+
+
+class QuestionChoice(StrictModel):
+    value: str = Field(min_length=1, max_length=40, pattern=r"^[a-z0-9_-]+$")
+    label: str = Field(min_length=1, max_length=40)
+    color: str | None = Field(default=None, pattern=r"^#[0-9a-fA-F]{6}$")
+
+
+class GeneratedQuestion(StrictModel):
+    activity_id: str = Field(alias="activityId")
+    prompt: str = Field(min_length=1, max_length=180)
+    hint: str = Field(min_length=1, max_length=140)
+    choices: list[QuestionChoice]
+    answer: str
+    explanation: str = Field(min_length=1, max_length=180)
+    provider: Literal["mwapi", "openrouter"]
 
 
 class CapabilitySnapshot(StrictModel):

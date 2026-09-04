@@ -55,3 +55,16 @@ npm run build
 ```
 
 Runtime data defaults to `.local/state/`, which is ignored by Git.
+
+## Claude Code provider profiles
+
+This checkout uses `https://api.mwapi.dev` as its primary Claude Code provider via
+the Git-ignored `.claude/settings.local.json` file. Replace the placeholder
+`ANTHROPIC_AUTH_TOKEN` in that file with the real token before starting Claude Code.
+
+An OpenRouter secondary profile is provided at
+`.claude/settings.openrouter.example.json`. To switch providers, copy it to the
+Git-ignored `.claude/settings.openrouter.json`, add the OpenRouter key, and then
+copy that file over `.claude/settings.local.json`. Restart Claude Code and use
+`/status` to verify the active base URL. Claude Code does not automatically fail
+over between different base URLs, so this switch is explicit.

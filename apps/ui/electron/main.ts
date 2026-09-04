@@ -3,6 +3,12 @@ import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+interface QuestionRequest {
+  previousPrompt: string | null;
+  neededHint: boolean;
+  recentPrompts: string[];
+}
+
 const directory = fileURLToPath(new URL(".", import.meta.url));
 const coreUrl = process.env.JAITRA_CORE_URL ?? "http://127.0.0.1:8765";
 const developmentUrl = process.env.JAITRA_UI_DEV_URL;
@@ -19,10 +25,14 @@ function coreEndpoint(path: string): string {
   return url.toString();
 }
 
-async function coreRequest(path: string, init?: RequestInit): Promise<unknown> {
+async function coreRequest(
+  path: string,
+  init?: RequestInit,
+  timeoutMilliseconds = 2000,
+): Promise<unknown> {
   const response = await fetch(coreEndpoint(path), {
     ...init,
-    signal: AbortSignal.timeout(2000),
+    signal: AbortSignal.timeout(timeoutMilliseconds),
   });
   if (!response.ok) throw new Error(`Core request failed: ${response.status}`);
   return response.json();
@@ -39,6 +49,17 @@ function installIpcHandlers(): void {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ apiVersion: "1.0", requestId: randomUUID(), type, payload: {} }),
     });
+  });
+  ipcMain.handle("jaitra:get-question", (_event, activityId: unknown, request: unknown) => {
+    if (typeof activityId !== "string" || !["picture_guess", "colours_shapes", "memory_cards", "riddle_guess"].includes(activityId)) {
+      throw new Error("Unsupported activity");
+    }
+    const body = request as QuestionRequest;
+    return coreRequest(`/api/v1/activities/${encodeURIComponent(activityId)}/question`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }, 70000);
   });
 }
 

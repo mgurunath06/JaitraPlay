@@ -1,4 +1,4 @@
-import type { StateSnapshot } from "../../../../packages/contracts/src";
+import type { GeneratedQuestion, QuestionRequest, StateSnapshot } from "../../../../packages/contracts/src";
 
 type CommandType = "BEGIN_INTERACTION" | "WELCOME_COMPLETE";
 
@@ -29,4 +29,17 @@ async function sendCommand(type: CommandType): Promise<unknown> {
   return response.json();
 }
 
-export const coreClient = { getSnapshot, sendCommand };
+async function getQuestion(activityId: string, request: QuestionRequest): Promise<GeneratedQuestion> {
+  if (window.jaitra) return window.jaitra.getQuestion(activityId, request);
+  if (!import.meta.env.DEV) throw new Error("Electron bridge is unavailable");
+
+  const response = await fetch(`/api/v1/activities/${encodeURIComponent(activityId)}/question`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(request),
+  });
+  if (!response.ok) throw new Error(`Question generation failed: ${response.status}`);
+  return (await response.json()) as GeneratedQuestion;
+}
+
+export const coreClient = { getSnapshot, sendCommand, getQuestion };

@@ -10,7 +10,22 @@ const idleSnapshot = {
     childDisplayName: "JAITRA",
     companionName: "Mimo",
     capabilities: { voice: "DISABLED" as const, camera: "DISABLED" as const },
-    activities: [{ activityId: "picture_guess", title: "Picture Guess" }],
+    activities: [
+      {
+        activityId: "picture_guess",
+        title: "Picture Guess",
+        description: "Spot the animal that Mimo asks for.",
+        icon: "🐘",
+        availability: "AVAILABLE" as const,
+      },
+      {
+        activityId: "memory_cards",
+        title: "Memory Match",
+        description: "Turn over cards and find every pair.",
+        icon: "🧠",
+        availability: "AVAILABLE" as const,
+      },
+    ],
   },
 };
 
@@ -20,6 +35,20 @@ describe("child shell", () => {
     window.jaitra = {
       getSnapshot: vi.fn().mockResolvedValue(idleSnapshot),
       sendCommand: vi.fn().mockResolvedValue({ status: "OK" }),
+      getQuestion: vi.fn().mockResolvedValue({
+        activityId: "picture_guess",
+        prompt: "Can you find the elephant?",
+        hint: "Look for a long trunk.",
+        choices: [
+          { value: "lion", label: "🦁", color: null },
+          { value: "elephant", label: "🐘", color: null },
+          { value: "frog", label: "🐸", color: null },
+          { value: "duck", label: "🦆", color: null },
+        ],
+        answer: "elephant",
+        explanation: "Elephants have long trunks.",
+        provider: "mwapi",
+      }),
     };
   });
 
@@ -62,5 +91,27 @@ describe("child shell", () => {
     await act(async () => Promise.resolve());
     expect(screen.getByRole("heading", { name: "Ready to play?" })).toBeVisible();
     expect(fetch).toHaveBeenCalledWith("/api/v1/snapshot", { cache: "no-store" });
+  });
+
+  it("shows multiple playable apps and completes a game round", async () => {
+    window.jaitra!.getSnapshot = vi.fn().mockResolvedValue({
+      ...idleSnapshot,
+      payload: { ...idleSnapshot.payload, appState: "HUB" as const },
+    });
+    render(<App />);
+    await act(async () => Promise.resolve());
+
+    expect(screen.getByRole("heading", { name: "Choose an app" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Picture Guess, available" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Memory Match, available" })).toBeEnabled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Picture Guess, available" }));
+    await act(async () => Promise.resolve());
+    expect(screen.getByRole("heading", { name: "Can you find the elephant?" })).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "🐘" }));
+    expect(screen.getByRole("status")).toHaveTextContent("Brilliant");
+    expect(screen.getByLabelText("1 stars")).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "Apps" }));
+    expect(screen.getByRole("heading", { name: "Choose an app" })).toBeVisible();
   });
 });

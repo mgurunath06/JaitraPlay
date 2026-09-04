@@ -9,6 +9,9 @@ JaitraPlay-SSH.bat
 
 .env
 .env.*
+.claude/settings.local.json
+.claude/settings.openrouter.json
+.claude/settings.openrouter.example.json
 *.pem
 *.key
 *.crt

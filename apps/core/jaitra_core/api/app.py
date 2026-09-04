@@ -6,7 +6,8 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, JSONResponse
 
-from jaitra_core.api.models import CommandEnvelope, ErrorEnvelope
+from jaitra_core.api.models import CommandEnvelope, ErrorEnvelope, QuestionRequest
+from jaitra_core.providers import QuestionGenerationError
 from jaitra_core.runtime import CoreRuntime
 
 
@@ -36,6 +37,14 @@ def create_app(runtime: CoreRuntime, *, manage_lifecycle: bool = True) -> FastAP
     @app.get("/api/v1/activities")
     async def activities() -> list[dict[str, str]]:
         return [item.model_dump(by_alias=True) for item in runtime.snapshot().payload.activities]
+
+    @app.post("/api/v1/activities/{activity_id}/question")
+    async def generate_question(activity_id: str, request: QuestionRequest) -> JSONResponse:
+        try:
+            question = await runtime.generate_question(activity_id, request)
+        except QuestionGenerationError:
+            raise HTTPException(status_code=503, detail="QUESTION_GENERATION_UNAVAILABLE") from None
+        return JSONResponse(question.model_dump(mode="json", by_alias=True))
 
     @app.post("/api/v1/commands")
     async def commands(command: CommandEnvelope) -> JSONResponse:
