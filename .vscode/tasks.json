@@ -76,7 +76,7 @@
     {
       "label": "JAITRA: Electron",
       "type": "shell",
-      "command": "source \"$HOME/.nvm/nvm.sh\" && unset ELECTRON_RUN_AS_NODE && exec npm run electron:dev",
+      "command": "if [ -n \"$WSL_DISTRO_NAME\" ]; then source \"$HOME/.nvm/nvm.sh\" && npm run electron:build && exec /mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"$(wslpath -w \"$PWD/deploy/scripts/run-windows-electron.ps1\")\"; else source \"$HOME/.nvm/nvm.sh\" && unset ELECTRON_RUN_AS_NODE && exec npm run electron:dev; fi",
       "options": {
         "cwd": "${workspaceFolder}",
         "shell": {
