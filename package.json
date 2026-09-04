@@ -1,0 +1,41 @@
+{
+  "name": "jaitra-play",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "dist-electron/main.js",
+  "scripts": {
+    "dev": "vite --config apps/ui/vite.config.ts",
+    "electron:dev": "npm run electron:build && JAITRA_UI_DEV_URL=http://127.0.0.1:5173 electron .",
+    "electron:build": "tsc -p apps/ui/electron/tsconfig.json",
+    "build": "npm run electron:build && tsc -b apps/ui/tsconfig.json && vite build --config apps/ui/vite.config.ts",
+    "test": "vitest run --config apps/ui/vite.config.ts",
+    "lint": "eslint apps/ui --max-warnings=0"
+  },
+  "dependencies": {
+    "@vitejs/plugin-react": "latest",
+    "electron": "latest",
+    "react": "latest",
+    "react-dom": "latest",
+    "vite": "latest"
+  },
+  "devDependencies": {
+    "@eslint/js": "latest",
+    "@testing-library/jest-dom": "latest",
+    "@testing-library/react": "latest",
+    "@types/node": "latest",
+    "@types/react": "latest",
+    "@types/react-dom": "latest",
+    "eslint": "latest",
+    "eslint-plugin-react-hooks": "latest",
+    "eslint-plugin-react-refresh": "latest",
+    "globals": "latest",
+    "jsdom": "latest",
+    "typescript": "latest",
+    "typescript-eslint": "latest",
+    "vitest": "latest"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
