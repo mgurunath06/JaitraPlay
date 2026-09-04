@@ -1,6 +1,5 @@
 from pathlib import Path
 
-import pytest
 from jaitra_core.config import AppConfig
 from jaitra_core.runtime import CoreRuntime
 from jaitra_core.state import AppState
@@ -23,8 +22,8 @@ def test_invalid_content_enters_recovery(tmp_path: Path, repository_root: Path) 
         }
     )
     runtime = CoreRuntime(config, repository_root=repository_root)
-    with pytest.raises(RuntimeError, match="no configured activity"):
-        runtime.start()
+    runtime.start()
     assert runtime.state_machine.state is AppState.RECOVERY
     assert runtime.health.core.state == "FATAL"
+    assert runtime.snapshot().payload.app_state is AppState.RECOVERY
     runtime.stop()

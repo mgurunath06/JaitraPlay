@@ -70,7 +70,6 @@ class CoreRuntime:
             log_event(
                 logger, logging.ERROR, "CORE_FATAL", "runtime", reason_code="BOOTSTRAP_FAILED"
             )
-            raise
 
     def stop(self) -> None:
         self.database.close()
