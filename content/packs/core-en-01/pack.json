@@ -1,0 +1,81 @@
+{
+  "schemaVersion": 1,
+  "packId": "core-en-01",
+  "version": "0.1.0",
+  "locale": "en",
+  "activities": [
+    {
+      "activityType": "picture_guess",
+      "minPoolSize": 8,
+      "choiceCount": 3,
+      "recentWindow": 8,
+      "families": ["animals"]
+    }
+  ],
+  "concepts": [
+    {
+      "concept_id": "animal_elephant",
+      "family": "animals",
+      "difficulty": "easy",
+      "activities": ["picture_guess"],
+      "language": {"en": {"display_label": "Elephant", "spoken_label": "elephant", "prompt": "Can you find the elephant?", "hint": "It has a long trunk."}},
+      "media": {"image": "assets/animal_elephant.svg", "alt": "A friendly blue elephant", "source": "Original JAITRA Play artwork", "license": "Project-owned"}
+    },
+    {
+      "concept_id": "animal_lion",
+      "family": "animals",
+      "difficulty": "easy",
+      "activities": ["picture_guess"],
+      "language": {"en": {"display_label": "Lion", "spoken_label": "lion", "prompt": "Can you find the lion?", "hint": "It has a big golden mane."}},
+      "media": {"image": "assets/animal_lion.svg", "alt": "A smiling golden lion", "source": "Original JAITRA Play artwork", "license": "Project-owned"}
+    },
+    {
+      "concept_id": "animal_cow",
+      "family": "animals",
+      "difficulty": "easy",
+      "activities": ["picture_guess"],
+      "language": {"en": {"display_label": "Cow", "spoken_label": "cow", "prompt": "Can you find the cow?", "hint": "It has black and white spots."}},
+      "media": {"image": "assets/animal_cow.svg", "alt": "A black and white cow", "source": "Original JAITRA Play artwork", "license": "Project-owned"}
+    },
+    {
+      "concept_id": "animal_dog",
+      "family": "animals",
+      "difficulty": "easy",
+      "activities": ["picture_guess"],
+      "language": {"en": {"display_label": "Dog", "spoken_label": "dog", "prompt": "Can you find the dog?", "hint": "It likes to wag its tail."}},
+      "media": {"image": "assets/animal_dog.svg", "alt": "A happy brown dog", "source": "Original JAITRA Play artwork", "license": "Project-owned"}
+    },
+    {
+      "concept_id": "animal_cat",
+      "family": "animals",
+      "difficulty": "easy",
+      "activities": ["picture_guess"],
+      "language": {"en": {"display_label": "Cat", "spoken_label": "cat", "prompt": "Can you find the cat?", "hint": "It has whiskers and says meow."}},
+      "media": {"image": "assets/animal_cat.svg", "alt": "A cheerful orange cat", "source": "Original JAITRA Play artwork", "license": "Project-owned"}
+    },
+    {
+      "concept_id": "animal_duck",
+      "family": "animals",
+      "difficulty": "easy",
+      "activities": ["picture_guess"],
+      "language": {"en": {"display_label": "Duck", "spoken_label": "duck", "prompt": "Can you find the duck?", "hint": "It has a beak and likes water."}},
+      "media": {"image": "assets/animal_duck.svg", "alt": "A bright yellow duck", "source": "Original JAITRA Play artwork", "license": "Project-owned"}
+    },
+    {
+      "concept_id": "animal_frog",
+      "family": "animals",
+      "difficulty": "easy",
+      "activities": ["picture_guess"],
+      "language": {"en": {"display_label": "Frog", "spoken_label": "frog", "prompt": "Can you find the frog?", "hint": "It is green and loves to hop."}},
+      "media": {"image": "assets/animal_frog.svg", "alt": "A happy green frog", "source": "Original JAITRA Play artwork", "license": "Project-owned"}
+    },
+    {
+      "concept_id": "animal_fish",
+      "family": "animals",
+      "difficulty": "easy",
+      "activities": ["picture_guess"],
+      "language": {"en": {"display_label": "Fish", "spoken_label": "fish", "prompt": "Can you find the fish?", "hint": "It swims in the water."}},
+      "media": {"image": "assets/animal_fish.svg", "alt": "A colorful swimming fish", "source": "Original JAITRA Play artwork", "license": "Project-owned"}
+    }
+  ]
+}
