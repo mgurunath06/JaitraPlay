@@ -1,0 +1,112 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "JAITRA: Core",
+      "type": "shell",
+      "command": "if [ ! -f config.yaml ]; then cp deploy/config/config.example.yaml config.yaml; fi; exec uv run --no-sync jaitra-core",
+      "options": {
+        "cwd": "${workspaceFolder}",
+        "env": {
+          "JAITRA_CONFIG": "${workspaceFolder}/config.yaml",
+          "JAITRA_REPOSITORY_ROOT": "${workspaceFolder}"
+        },
+        "shell": {
+          "executable": "/bin/bash",
+          "args": ["-lc"]
+        }
+      },
+      "isBackground": true,
+      "problemMatcher": {
+        "owner": "jaitra-core",
+        "pattern": {
+          "regexp": ".*"
+        },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": ".*",
+          "endsPattern": "Uvicorn running on.*127\\.0\\.0\\.1:8765"
+        }
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "group": "jaitra",
+        "clear": true,
+        "showReuseMessage": false
+      },
+      "runOptions": {
+        "instanceLimit": 1
+      }
+    },
+    {
+      "label": "JAITRA: Vite",
+      "type": "shell",
+      "command": "source \"$HOME/.nvm/nvm.sh\" && exec npm run dev",
+      "options": {
+        "cwd": "${workspaceFolder}",
+        "shell": {
+          "executable": "/bin/bash",
+          "args": ["-lc"]
+        }
+      },
+      "isBackground": true,
+      "problemMatcher": {
+        "owner": "jaitra-vite",
+        "pattern": {
+          "regexp": ".*"
+        },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": ".*",
+          "endsPattern": "Local:.*127\\.0\\.0\\.1:5173"
+        }
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "group": "jaitra",
+        "clear": true,
+        "showReuseMessage": false
+      },
+      "runOptions": {
+        "instanceLimit": 1
+      }
+    },
+    {
+      "label": "JAITRA: Electron",
+      "type": "shell",
+      "command": "source \"$HOME/.nvm/nvm.sh\" && exec npm run electron:dev",
+      "options": {
+        "cwd": "${workspaceFolder}",
+        "shell": {
+          "executable": "/bin/bash",
+          "args": ["-lc"]
+        }
+      },
+      "dependsOn": ["JAITRA: Vite"],
+      "dependsOrder": "sequence",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "group": "jaitra",
+        "clear": true,
+        "showReuseMessage": false
+      },
+      "runOptions": {
+        "instanceLimit": 1
+      }
+    },
+    {
+      "label": "JAITRA Play: Run all",
+      "dependsOn": ["JAITRA: Core", "JAITRA: Electron"],
+      "dependsOrder": "parallel",
+      "problemMatcher": [],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      }
+    }
+  ]
+}

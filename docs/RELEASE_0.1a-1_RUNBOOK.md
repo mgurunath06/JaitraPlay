@@ -27,6 +27,14 @@ deploy/scripts/smoke-core.sh
 
 ## Run the processes
 
+### VS Code shortcut
+
+Press `Ctrl+Shift+B` and choose **JAITRA Play: Run all** if VS Code asks. It is the default build task and starts Core, Vite, and Electron in three grouped terminal panes. Electron waits for Vite to report that port 5173 is ready. If `config.yaml` is missing, the Core task creates it from the checked-in example.
+
+To stop everything, use **Terminal: Terminate All Tasks** from the Command Palette (`Ctrl+Shift+P`).
+
+### Manual terminals
+
 Terminal one:
 
 ```bash
