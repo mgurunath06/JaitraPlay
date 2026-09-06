@@ -26,7 +26,7 @@ class CompanionConfig(StrictModel):
 
 
 class UiConfig(StrictModel):
-    max_hub_choices: int = Field(default=4, ge=1, le=4)
+    max_hub_choices: int = Field(default=5, ge=1, le=5)
     inactivity_seconds: int = Field(default=300, ge=30, le=3600)
     pointer_visible: bool = True
 
@@ -77,6 +77,11 @@ class PathsConfig(StrictModel):
     migrations_dir: Path = Path("migrations")
 
 
+class VoiceConfig(StrictModel):
+    enabled: bool = False
+    model_path: Path = Path(".local/models/vosk-model-small-en-us-0.15")
+
+
 class AppConfig(StrictModel):
     schema_version: Literal[1]
     child: ChildConfig
@@ -88,6 +93,7 @@ class AppConfig(StrictModel):
     logging: LoggingConfig = LoggingConfig()
     server: ServerConfig = ServerConfig()
     paths: PathsConfig = PathsConfig()
+    voice: VoiceConfig = VoiceConfig()
 
     @model_validator(mode="after")
     def companion_is_distinct(self) -> AppConfig:

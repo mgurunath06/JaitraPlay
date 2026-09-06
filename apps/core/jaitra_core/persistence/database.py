@@ -82,6 +82,23 @@ class Database:
         row = self._required_connection().execute("PRAGMA integrity_check").fetchone()
         return bool(row and row[0] == "ok")
 
+    def recent_questions(self) -> list[str]:
+        rows = self._required_connection().execute(
+            "SELECT question_json FROM question_history ORDER BY id DESC LIMIT 120"
+        ).fetchall()
+        return [str(row["question_json"]) for row in rows]
+
+    def record_question(self, activity_id: str, question_json: str) -> None:
+        with self.transaction() as connection:
+            connection.execute(
+                "INSERT INTO question_history(activity_id, question_json) VALUES (?, ?)",
+                (activity_id, question_json),
+            )
+            connection.execute(
+                "DELETE FROM question_history WHERE id NOT IN "
+                "(SELECT id FROM question_history ORDER BY id DESC LIMIT 120)"
+            )
+
     def record_hint_used(self, activity_id: str, prompt: str) -> None:
         with self.transaction() as connection:
             connection.execute(

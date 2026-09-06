@@ -15,7 +15,12 @@ const developmentUrl = process.env.JAITRA_UI_DEV_URL;
 let mainWindow: BrowserWindow | null = null;
 
 const isWsl = process.platform === "linux" && Boolean(process.env.WSL_DISTRO_NAME);
-if (isWsl) app.disableHardwareAcceleration();
+// Pose preprocessing needs WebGL even with CPU inference. SwiftShader supplies it
+// on GPU-less WSL; the Ubuntu appliance keeps its native graphics driver.
+if (isWsl || process.env.JAITRA_SOFTWARE_RENDERING === "1") {
+  app.commandLine.appendSwitch("use-angle", "swiftshader");
+  app.commandLine.appendSwitch("enable-unsafe-swiftshader");
+}
 
 function coreEndpoint(path: string): string {
   const url = new URL(path, coreUrl);
@@ -38,7 +43,30 @@ async function coreRequest(
   return response.json();
 }
 
+function validStoryId(value: unknown): value is string {
+  return typeof value === "string" && /^[0-9a-f-]{36}$/.test(value);
+}
+
+async function coreImageRequest(path: string): Promise<string> {
+  const response = await fetch(coreEndpoint(path), { signal: AbortSignal.timeout(15000) });
+  if (!response.ok) throw new Error(`Core image request failed: ${response.status}`);
+  const contentType = response.headers.get("content-type") ?? "image/png";
+  const data = Buffer.from(await response.arrayBuffer()).toString("base64");
+  return `data:${contentType};base64,${data}`;
+}
+
 function installIpcHandlers(): void {
+  ipcMain.handle("jaitra:transcribe", (event, request: unknown) => {
+    if (event.sender !== mainWindow?.webContents || event.senderFrame !== mainWindow.webContents.mainFrame) throw new Error("Unknown sender");
+    if (!request || typeof request !== "object") throw new Error("Invalid audio");
+    const { audio, sampleRate } = request as { audio: unknown; sampleRate: unknown };
+    if (typeof audio !== "string" || audio.length > 1024000 || ![16000, 44100, 48000].includes(Number(sampleRate))) throw new Error("Invalid audio");
+    return coreRequest("/api/v1/voice/transcribe", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ audio, sampleRate }),
+    }, 30000);
+  });
+  ipcMain.handle("jaitra:quit", () => app.quit());
   ipcMain.handle("jaitra:get-snapshot", () => coreRequest("/api/v1/snapshot"));
   ipcMain.handle("jaitra:send-command", (_event, type: unknown) => {
     if (type !== "BEGIN_INTERACTION" && type !== "WELCOME_COMPLETE") {
@@ -60,6 +88,25 @@ function installIpcHandlers(): void {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     }, 70000);
+  });
+  ipcMain.handle("jaitra:create-storybook", (_event, topic: unknown) => {
+    if (topic !== null && (typeof topic !== "string" || topic.length < 3 || topic.length > 120)) {
+      throw new Error("Invalid story topic");
+    }
+    return coreRequest("/api/v1/storybooks", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ topic }),
+    }, 10000);
+  });
+  ipcMain.handle("jaitra:get-storybook", (_event, storyId: unknown) => {
+    if (!validStoryId(storyId)) throw new Error("Invalid story id");
+    return coreRequest(`/api/v1/storybooks/${storyId}`, undefined, 10000);
+  });
+  ipcMain.handle("jaitra:get-storybook-image", (_event, storyId: unknown, pageNumber: unknown) => {
+    if (!validStoryId(storyId) || !Number.isInteger(pageNumber) || Number(pageNumber) < 1 || Number(pageNumber) > 15) {
+      throw new Error("Invalid story image request");
+    }
+    return coreImageRequest(`/api/v1/storybooks/${storyId}/pages/${Number(pageNumber)}/image`);
   });
 }
 
@@ -114,8 +161,12 @@ function createWindow(): BrowserWindow {
 }
 
 app.whenReady().then(() => {
-  session.defaultSession.setPermissionRequestHandler((_contents, _permission, callback) => callback(false));
-  session.defaultSession.setPermissionCheckHandler(() => false);
+  session.defaultSession.setPermissionRequestHandler((contents, permission, callback, details) => {
+    callback(contents === mainWindow?.webContents && permission === "media" && details.isMainFrame && "mediaTypes" in details && details.mediaTypes?.length === 1 && ["audio", "video"].includes(details.mediaTypes[0]));
+  });
+  session.defaultSession.setPermissionCheckHandler((contents, permission, _origin, details) =>
+    contents === mainWindow?.webContents && permission === "media" && details.isMainFrame && (details.mediaType === "audio" || details.mediaType === "video")
+  );
   installIpcHandlers();
   mainWindow = createWindow();
 });

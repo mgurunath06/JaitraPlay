@@ -14,6 +14,11 @@ dependencies = [
 jaitra-core = "jaitra_core.main:run"
 jaitra-content = "jaitra_core.content.cli:main"
 
+[project.optional-dependencies]
+voice = [
+    "vosk>=0.3.45,<0.4",
+]
+
 [dependency-groups]
 dev = [
   "httpx>=0.28,<1",

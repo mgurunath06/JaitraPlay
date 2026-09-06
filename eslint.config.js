@@ -3,7 +3,7 @@ import globals from "globals";
 import tseslint from "typescript-eslint";
 
 export default tseslint.config(
-  { ignores: ["dist/**", "dist-electron/**", "node_modules/**"] },
+  { ignores: ["dist/**", "dist-electron/**", "node_modules/**", "apps/ui/public/camera/vendor/**"] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {

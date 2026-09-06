@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 from pathlib import Path
@@ -16,13 +17,16 @@ from jaitra_core.api.models import (
     QuestionRequest,
     SnapshotPayload,
     StateSnapshot,
+    StorybookSnapshot,
 )
 from jaitra_core.config import AppConfig
 from jaitra_core.content import ContentCatalog
 from jaitra_core.observability import ComponentHealth, HealthModel, HealthState, log_event
 from jaitra_core.persistence import Database
-from jaitra_core.providers import AiQuestionService
+from jaitra_core.providers import AiQuestionService, QuestionGenerationError, StorybookService
+from jaitra_core.providers.variety import local_question, repeats_question
 from jaitra_core.state import StateMachine, TransitionError
+from jaitra_core.voice import VoiceService
 
 logger = logging.getLogger(__name__)
 
@@ -30,13 +34,13 @@ APP_CATALOG = (
     {
         "activity_id": "picture_guess",
         "title": "Picture Guess",
-        "description": "Spot the animal that Mimo asks for.",
+        "description": "Explore pictures, counting and odd-one-out puzzles.",
         "icon": "🐘",
     },
     {
         "activity_id": "colours_shapes",
         "title": "Colour Quest",
-        "description": "Explore bright colours and playful shapes.",
+        "description": "Explore colours, shapes and room treasure hunts.",
         "icon": "🎨",
     },
     {
@@ -51,7 +55,14 @@ APP_CATALOG = (
         "description": "Listen to clues and discover the answer.",
         "icon": "🌱",
     },
+    {
+        "activity_id": "storybook",
+        "title": "Mimo’s Storybook",
+        "description": "Create and explore a new illustrated story.",
+        "icon": "📖",
+    },
 )
+QUESTION_ACTIVITY_IDS = {"picture_guess", "colours_shapes", "memory_cards", "riddle_guess"}
 
 
 class CoreRuntime:
@@ -59,6 +70,7 @@ class CoreRuntime:
         self.config = config
         self.repository_root = repository_root
         self.health = HealthModel()
+        self.voice = VoiceService(self._resolve(config.voice.model_path), config.voice.enabled)
         self.state_machine = StateMachine()
         state_dir = self._resolve(config.paths.state_dir)
         self.database = Database(
@@ -66,10 +78,13 @@ class CoreRuntime:
         )
         self.catalog = ContentCatalog(self._resolve(config.paths.content_dir))
         self.questions = AiQuestionService(repository_root)
+        self.storybooks = StorybookService(repository_root, state_dir)
+        self._question_lock = asyncio.Lock()
         self.enabled_activities: list[str] = []
 
     def start(self) -> None:
         try:
+            self.voice.start()
             self.database.open()
             self.database.migrate(__version__)
             self.database.record_settings(self.config.digest(), self.config.normalized_json())
@@ -103,6 +118,7 @@ class CoreRuntime:
             )
 
     def stop(self) -> None:
+        self.storybooks.stop()
         self.database.close()
 
     def snapshot(self) -> StateSnapshot:
@@ -111,7 +127,9 @@ class CoreRuntime:
                 appState=self.state_machine.state,
                 childDisplayName=self.config.child.display_name,
                 companionName=self.config.companion.name,
-                capabilities=CapabilitySnapshot(),
+                capabilities=CapabilitySnapshot(
+                    voice="AVAILABLE" if self.voice.available else "DISABLED"
+                ),
                 activities=[
                     ActivityDescriptor(
                         activityId=item["activity_id"],
@@ -128,16 +146,37 @@ class CoreRuntime:
     async def generate_question(
         self, activity_id: str, request: QuestionRequest
     ) -> GeneratedQuestion:
-        adapted = request
-        if request.previous_prompt and request.needed_hint:
-            self.database.record_hint_used(activity_id, request.previous_prompt)
-        elif request.previous_prompt is None:
-            previous_hint = self.database.last_hint_prompt(activity_id)
-            if previous_hint:
-                adapted = request.model_copy(
-                    update={"previous_prompt": previous_hint, "needed_hint": True}
-                )
-        return await self.questions.generate(activity_id, adapted)
+        if activity_id not in QUESTION_ACTIVITY_IDS:
+            raise QuestionGenerationError("unsupported activity")
+        async with self._question_lock:
+            history = [
+                GeneratedQuestion.model_validate_json(raw)
+                for raw in self.database.recent_questions()
+            ]
+            if request.previous_prompt and request.needed_hint:
+                self.database.record_hint_used(activity_id, request.previous_prompt)
+            # History belongs to the appliance, including questions from other games.
+            recent = list(dict.fromkeys([item.prompt for item in history] + request.recent_prompts))
+            adapted = request.model_copy(update={"recent_prompts": recent})
+            previous = next((item for item in history if item.activity_id == activity_id), None)
+            # Alternate curated interactive challenges with provider-generated quizzes.
+            if previous is not None and previous.provider != "local":
+                question = local_question(activity_id, history)
+            else:
+                try:
+                    question = await self.questions.generate(activity_id, adapted)
+                    if repeats_question(question, history, recent):
+                        raise QuestionGenerationError("repeated question")
+                except QuestionGenerationError:
+                    question = local_question(activity_id, history)
+            self.database.record_question(activity_id, question.model_dump_json(by_alias=True))
+            return question
+
+    def start_storybook(self, topic: str | None) -> StorybookSnapshot:
+        return self.storybooks.start(topic)
+
+    def storybook(self, story_id: str) -> StorybookSnapshot:
+        return self.storybooks.get(story_id)
 
     def dispatch(self, command: CommandEnvelope) -> CommandResult | ErrorEnvelope:
         connection = self.database.connection

@@ -24,12 +24,13 @@ def test_api_boot_and_idempotent_commands(config: AppConfig, repository_root: Pa
             assert snapshot["payload"]["appState"] == "IDLE"
             assert snapshot["payload"]["capabilities"] == {
                 "voice": "DISABLED",
-                "camera": "DISABLED",
+                "camera": "CLIENT_MANAGED",
             }
-            assert len(snapshot["payload"]["activities"]) == 4
+            assert len(snapshot["payload"]["activities"]) == 5
             assert snapshot["payload"]["activities"][0]["activityId"] == "picture_guess"
             assert snapshot["payload"]["activities"][0]["availability"] == "AVAILABLE"
             assert snapshot["payload"]["activities"][1]["availability"] == "AVAILABLE"
+            assert snapshot["payload"]["activities"][4]["activityId"] == "storybook"
 
             request_id = str(uuid4())
             command = {

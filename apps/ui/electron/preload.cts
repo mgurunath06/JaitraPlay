@@ -8,8 +8,14 @@ interface QuestionRequest {
 }
 
 contextBridge.exposeInMainWorld("jaitra", {
+  transcribe: (request: { audio: string; sampleRate: number }) => ipcRenderer.invoke("jaitra:transcribe", request),
+  quit: () => ipcRenderer.invoke("jaitra:quit"),
   getSnapshot: () => ipcRenderer.invoke("jaitra:get-snapshot"),
   sendCommand: (type: CommandType) => ipcRenderer.invoke("jaitra:send-command", type),
   getQuestion: (activityId: string, request: QuestionRequest) =>
     ipcRenderer.invoke("jaitra:get-question", activityId, request),
+  createStorybook: (topic: string | null) => ipcRenderer.invoke("jaitra:create-storybook", topic),
+  getStorybook: (storyId: string) => ipcRenderer.invoke("jaitra:get-storybook", storyId),
+  getStorybookImage: (storyId: string, pageNumber: number) =>
+    ipcRenderer.invoke("jaitra:get-storybook-image", storyId, pageNumber),
 });

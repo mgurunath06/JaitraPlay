@@ -19,7 +19,7 @@ export interface StateSnapshot {
     appState: AppState;
     childDisplayName: string;
     companionName: string;
-    capabilities: { voice: "DISABLED"; camera: "DISABLED" };
+    capabilities: { voice: "DISABLED" | "AVAILABLE"; camera: "DISABLED" | "CLIENT_MANAGED" };
     activities: Array<{
       activityId: string;
       title: string;
@@ -37,11 +37,38 @@ export interface GeneratedQuestion {
   choices: Array<{ value: string; label: string; color: string | null }>;
   answer: string;
   explanation: string;
-  provider: "mwapi" | "openrouter";
+  provider: "mwapi" | "startupapi" | "openrouter" | "local";
+  kind?: "quiz" | "memory" | "room_hunt";
 }
 
 export interface QuestionRequest {
   previousPrompt: string | null;
   neededHint: boolean;
   recentPrompts: string[];
+}
+
+export interface TranscriptionRequest {
+  audio: string;
+  sampleRate: number;
+}
+
+export type StorybookStatus = "planning" | "illustrating" | "ready" | "failed";
+
+export interface StorybookPage {
+  pageNumber: number;
+  text: string;
+  imageReady: boolean;
+}
+
+export interface StorybookSnapshot {
+  storyId: string;
+  status: StorybookStatus;
+  topic: string;
+  title: string | null;
+  totalPages: 15;
+  completedPages: number;
+  pages: StorybookPage[];
+  textProvider: string | null;
+  imageProvider: string;
+  error: string | null;
 }

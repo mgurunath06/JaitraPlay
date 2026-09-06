@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import secrets
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -11,6 +12,7 @@ from typing import Any, Literal
 from jaitra_core.api.models import GeneratedQuestion, QuestionChoice, QuestionRequest
 
 logger = logging.getLogger(__name__)
+ProviderName = Literal["mwapi", "startupapi", "openrouter"]
 
 
 class QuestionGenerationError(RuntimeError):
@@ -39,12 +41,19 @@ class AiQuestionService:
                 )
         raise QuestionGenerationError(", ".join(errors) or "no AI provider profiles configured")
 
-    def _profile_paths(self) -> list[tuple[Literal["mwapi", "openrouter"], Path]]:
+    def _profile_paths(self) -> list[tuple[ProviderName, Path]]:
         root = self.repository_root / ".claude"
-        secondary = root / "settings.openrouter.json"
-        if not secondary.is_file():
-            secondary = root / "settings.openrouter.example.json"
-        return [("mwapi", root / "settings.local.json"), ("openrouter", secondary)]
+        startupapi = root / "settings.startupapi.json"
+        if not startupapi.is_file():
+            startupapi = root / "settings.startupapi.example.json"
+        openrouter = root / "settings.openrouter.json"
+        if not openrouter.is_file():
+            openrouter = root / "settings.openrouter.example.json"
+        return [
+            ("mwapi", root / "settings.local.json"),
+            ("startupapi", startupapi),
+            ("openrouter", openrouter),
+        ]
 
     @staticmethod
     def _load_profile(path: Path) -> dict[str, str]:
@@ -57,7 +66,7 @@ class AiQuestionService:
 
     def _request_provider(
         self,
-        name: Literal["mwapi", "openrouter"],
+        name: ProviderName,
         profile: dict[str, str],
         activity_id: str,
         request: QuestionRequest,
@@ -108,8 +117,9 @@ class AiQuestionService:
     def _prompt(activity_id: str, request: QuestionRequest) -> str:
         activity_rules = {
             "picture_guess": (
-                "Create an animal identification question. Each choice label must be one animal "
-                "emoji. Use four different familiar animals."
+                "Show four distinct emoji figures: choose a fresh theme from foods, vehicles, "
+                "nature, instruments or household objects. Ask for identification, a use, "
+                "or a distinguishing property. Avoid animal riddles."
             ),
             "colours_shapes": (
                 "Create a colour identification question. Each choice label must be its simple "
@@ -121,8 +131,8 @@ class AiQuestionService:
                 "pairs."
             ),
             "riddle_guess": (
-                "Create a short animal riddle. Give four choices whose labels include an emoji and "
-                "animal name."
+                "Create a short what-am-I riddle about a tool, food, vehicle, instrument or "
+                "natural object. Give four emoji-and-name choices. Avoid animal identification."
             ),
         }
         if activity_id not in activity_rules:
@@ -134,11 +144,12 @@ class AiQuestionService:
                 "and slightly easier question reinforcing that concept: "
                 f"{request.previous_prompt!r}."
             )
-        recent = "; ".join(request.recent_prompts[-6:])
+        recent = "; ".join(request.recent_prompts[:120])
         return (
             "You create safe, cheerful, factual learning games for children ages 4 to 7. "
             f"{activity_rules[activity_id]}{adaptation} Do not repeat these recent prompts: "
-            f"{recent!r}. "
+            f"{recent!r}. Do not just reword an old question or reuse its target. "
+            f"Creative seed: {secrets.token_hex(8)}. "
             "Return JSON only with this exact shape: "
             '{"prompt":"...","hint":"...","choices":[{"value":"unique_slug",'
             '"label":"...","color":null}],"answer":"one_choice_value","explanation":"..."}. '
@@ -148,7 +159,7 @@ class AiQuestionService:
 
     @staticmethod
     def _validate(
-        raw: str, activity_id: str, provider: Literal["mwapi", "openrouter"]
+        raw: str, activity_id: str, provider: ProviderName
     ) -> GeneratedQuestion:
         start = raw.find("{")
         end = raw.rfind("}")
@@ -171,4 +182,5 @@ class AiQuestionService:
             answer=data["answer"],
             explanation=data["explanation"],
             provider=provider,
+            kind="memory" if activity_id == "memory_cards" else "quiz",
         )

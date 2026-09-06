@@ -1,14 +1,22 @@
 from __future__ import annotations
 
+import asyncio
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, JSONResponse
 
-from jaitra_core.api.models import CommandEnvelope, ErrorEnvelope, QuestionRequest
-from jaitra_core.providers import QuestionGenerationError
+from jaitra_core.api.models import (
+    CommandEnvelope,
+    ErrorEnvelope,
+    QuestionRequest,
+    StorybookCreateRequest,
+    TranscriptionRequest,
+)
+from jaitra_core.providers import QuestionGenerationError, StorybookNotFound
 from jaitra_core.runtime import CoreRuntime
+from jaitra_core.voice import VoiceUnavailable
 
 
 def create_app(runtime: CoreRuntime, *, manage_lifecycle: bool = True) -> FastAPI:
@@ -21,6 +29,18 @@ def create_app(runtime: CoreRuntime, *, manage_lifecycle: bool = True) -> FastAP
             runtime.stop()
 
     app = FastAPI(title="JAITRA Core", version="1.0", lifespan=lifespan)
+
+    @app.post("/api/v1/voice/transcribe")
+    async def transcribe(request: TranscriptionRequest) -> dict[str, str]:
+        try:
+            text = await asyncio.to_thread(
+                runtime.voice.transcribe, request.audio, request.sample_rate
+            )
+            return {"text": text}
+        except VoiceUnavailable:
+            raise HTTPException(status_code=503, detail="VOICE_UNAVAILABLE") from None
+        except ValueError:
+            raise HTTPException(status_code=422, detail="INVALID_AUDIO") from None
 
     @app.get("/api/v1/health")
     async def health() -> dict[str, object]:
@@ -45,6 +65,32 @@ def create_app(runtime: CoreRuntime, *, manage_lifecycle: bool = True) -> FastAP
         except QuestionGenerationError:
             raise HTTPException(status_code=503, detail="QUESTION_GENERATION_UNAVAILABLE") from None
         return JSONResponse(question.model_dump(mode="json", by_alias=True))
+
+    @app.post("/api/v1/storybooks", status_code=202)
+    async def create_storybook(request: StorybookCreateRequest) -> JSONResponse:
+        try:
+            story = runtime.start_storybook(request.topic)
+        except ValueError:
+            raise HTTPException(status_code=422, detail="TOPIC_NOT_ALLOWED") from None
+        return JSONResponse(
+            story.model_dump(mode="json", by_alias=True), status_code=202
+        )
+
+    @app.get("/api/v1/storybooks/{story_id}")
+    async def storybook(story_id: str) -> JSONResponse:
+        try:
+            story = runtime.storybook(story_id)
+        except StorybookNotFound:
+            raise HTTPException(status_code=404, detail="STORYBOOK_NOT_FOUND") from None
+        return JSONResponse(story.model_dump(mode="json", by_alias=True))
+
+    @app.get("/api/v1/storybooks/{story_id}/pages/{page_number}/image")
+    async def storybook_image(story_id: str, page_number: int) -> FileResponse:
+        try:
+            path = runtime.storybooks.image_path(story_id, page_number)
+        except StorybookNotFound:
+            raise HTTPException(status_code=404, detail="STORY_IMAGE_NOT_FOUND") from None
+        return FileResponse(path, media_type="image/png", headers={"Cache-Control": "private"})
 
     @app.post("/api/v1/commands")
     async def commands(command: CommandEnvelope) -> JSONResponse:

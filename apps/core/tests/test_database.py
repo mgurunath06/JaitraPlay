@@ -11,7 +11,7 @@ def test_migrations_are_repeatable(tmp_path: Path, repository_root: Path) -> Non
     assert database.integrity_check()
     assert database.connection is not None
     count = database.connection.execute("SELECT COUNT(*) FROM schema_migrations").fetchone()[0]
-    assert count == 2
+    assert count == 3
     database.close()
 
 

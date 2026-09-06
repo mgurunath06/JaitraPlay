@@ -1,0 +1,27 @@
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, expect, it, vi } from "vitest";
+import { coreClient } from "../app/coreClient";
+import { recordVoice } from "../voice/record";
+import { SetupPanel } from "./SetupPanel";
+import { readSettings } from "./settings";
+vi.mock("../voice/record", () => ({ recordVoice: vi.fn() }));
+afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); localStorage.clear(); });
+it("saves a practice correction only after explicit teaching and can clear it", async () => {
+  vi.spyOn(coreClient, "getSnapshot").mockResolvedValue({ apiVersion: "1.0", type: "STATE_SNAPSHOT", payload: { appState: "IDLE", childDisplayName: "Child", companionName: "Mimo", activities: [], capabilities: { voice: "AVAILABLE", camera: "CLIENT_MANAGED" } } });
+  vi.spyOn(coreClient, "transcribe").mockResolvedValue({ text: "read" });
+  vi.mocked(recordVoice).mockResolvedValue({ cancel: vi.fn(), stop: vi.fn().mockResolvedValue({ audio: "AAAA", sampleRate: 16000 }) });
+  vi.stubGlobal("navigator", { mediaDevices: { enumerateDevices: vi.fn().mockResolvedValue([]) } });
+  render(<SetupPanel onClose={vi.fn()} />);
+  await act(async () => Promise.resolve());
+  expect(screen.getByLabelText("Practice word")).toHaveValue("mimo");
+  fireEvent.change(screen.getByLabelText("Practice word"), { target: { value: "red" } });
+  fireEvent.click(screen.getByRole("button", { name: /Say my answer/ }));
+  await act(async () => Promise.resolve());
+  fireEvent.click(screen.getByRole("button", { name: "Stop listening" }));
+  await act(async () => Promise.resolve());
+  expect(readSettings().voiceAliases).toEqual({});
+  fireEvent.click(screen.getByRole("button", { name: "Teach this answer" }));
+  expect(readSettings().voiceAliases).toEqual({ read: "red" });
+  fireEvent.click(screen.getByRole("button", { name: "Clear voice corrections" }));
+  expect(readSettings().voiceAliases).toEqual({});
+});

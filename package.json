@@ -10,9 +10,13 @@
     "electron:build": "tsc -p apps/ui/electron/tsconfig.json",
     "build": "npm run electron:build && tsc -b apps/ui/tsconfig.json && vite build --config apps/ui/vite.config.ts",
     "test": "vitest run --config apps/ui/vite.config.ts",
-    "lint": "eslint apps/ui --max-warnings=0"
+    "lint": "eslint apps/ui --max-warnings=0",
+    "setup:camera": "node deploy/scripts/setup-camera.mjs",
+    "predev": "npm run setup:camera",
+    "prebuild": "npm run setup:camera"
   },
   "dependencies": {
+    "@mediapipe/tasks-vision": "1.0.1",
     "@vitejs/plugin-react": "latest",
     "electron": "latest",
     "react": "latest",

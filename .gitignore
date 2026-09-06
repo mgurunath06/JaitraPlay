@@ -10,6 +10,7 @@ JaitraPlay-SSH.bat
 .env
 .env.*
 .claude/settings.local.json
+.claude/settings.startupapi.json
 .claude/settings.openrouter.json
 .claude/settings.openrouter.example.json
 *.pem
@@ -51,3 +52,6 @@ tmp/
 
 config.yaml
 .local/
+
+# Generated local camera runtime/model assets
+apps/ui/public/camera/vendor/

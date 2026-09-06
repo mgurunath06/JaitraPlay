@@ -6,6 +6,7 @@ export default defineConfig({
   base: "./",
   plugins: [react()],
   build: {
+    assetsInlineLimit: 0,
     outDir: "../../dist/ui",
     emptyOutDir: true,
   },

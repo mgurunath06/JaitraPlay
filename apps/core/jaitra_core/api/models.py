@@ -47,12 +47,41 @@ class GeneratedQuestion(StrictModel):
     choices: list[QuestionChoice]
     answer: str
     explanation: str = Field(min_length=1, max_length=180)
-    provider: Literal["mwapi", "openrouter"]
+    provider: Literal["mwapi", "startupapi", "openrouter", "local"]
+    kind: Literal["quiz", "memory", "room_hunt"] = "quiz"
+
+
+class TranscriptionRequest(StrictModel):
+    audio: str = Field(min_length=4, max_length=1024000)
+    sample_rate: Literal[16000, 44100, 48000] = Field(alias="sampleRate")
+
+
+class StorybookCreateRequest(StrictModel):
+    topic: str | None = Field(default=None, min_length=3, max_length=120)
+
+
+class StorybookPage(StrictModel):
+    page_number: int = Field(alias="pageNumber", ge=1, le=15)
+    text: str = Field(min_length=1, max_length=280)
+    image_ready: bool = Field(default=False, alias="imageReady")
+
+
+class StorybookSnapshot(StrictModel):
+    story_id: str = Field(alias="storyId", pattern=r"^[0-9a-f-]{36}$")
+    status: Literal["planning", "illustrating", "ready", "failed"]
+    topic: str = Field(min_length=3, max_length=120)
+    title: str | None = Field(default=None, max_length=80)
+    total_pages: Literal[15] = Field(default=15, alias="totalPages")
+    completed_pages: int = Field(default=0, alias="completedPages", ge=0, le=15)
+    pages: list[StorybookPage] = Field(default=[])
+    text_provider: str | None = Field(default=None, alias="textProvider", max_length=40)
+    image_provider: str = Field(default="OpenRouter", alias="imageProvider", max_length=80)
+    error: str | None = Field(default=None, max_length=120)
 
 
 class CapabilitySnapshot(StrictModel):
-    voice: Literal["DISABLED"] = "DISABLED"
-    camera: Literal["DISABLED"] = "DISABLED"
+    voice: Literal["DISABLED", "AVAILABLE"] = "DISABLED"
+    camera: Literal["DISABLED", "CLIENT_MANAGED"] = "CLIENT_MANAGED"
 
 
 class SnapshotPayload(StrictModel):

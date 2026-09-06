@@ -1,5 +1,7 @@
-import { useState } from "react";
+import { quietMimo, reactMimo } from "../components/mimo";
+import { useEffect, useState } from "react";
 import { PlayApp, type PlayableActivity } from "./PlayApp";
+import { StorybookApp } from "./StorybookApp";
 
 interface Activity extends PlayableActivity {
   activityId: string;
@@ -9,11 +11,16 @@ interface Activity extends PlayableActivity {
   availability: "AVAILABLE" | "COMING_SOON";
 }
 
-export function Hub({ activities }: { activities: Activity[] }) {
+export function Hub({ activities, voiceAvailable = false, onPlayingChange, homeRequest }: { activities: Activity[]; voiceAvailable?: boolean; onPlayingChange: (playing: boolean) => void; homeRequest: number }) {
   const [selected, setSelected] = useState<Activity | null>(null);
 
+  useEffect(() => { onPlayingChange(Boolean(selected)); return () => onPlayingChange(false); }, [selected, onPlayingChange]);
+  useEffect(() => { setSelected(null); quietMimo(); }, [homeRequest]);
   if (selected) {
-    return <PlayApp activity={selected} onBack={() => setSelected(null)} />;
+    if (selected.activityId === "storybook") {
+      return <StorybookApp voiceAvailable={voiceAvailable} onBack={() => { quietMimo(); setSelected(null); }} />;
+    }
+    return <PlayApp voiceAvailable={voiceAvailable} activity={selected} onBack={() => { quietMimo(); setSelected(null); }} />;
   }
 
   return (
@@ -36,7 +43,7 @@ export function Hub({ activities }: { activities: Activity[] }) {
               key={activity.activityId}
               type="button"
               disabled={!available}
-              onClick={() => setSelected(activity)}
+              onClick={() => { reactMimo("start"); setSelected(activity); }}
               aria-label={`${activity.title}, ${available ? "available" : "coming soon"}`}
             >
               <span className="activity-card-top">

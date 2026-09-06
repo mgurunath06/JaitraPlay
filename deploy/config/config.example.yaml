@@ -4,7 +4,7 @@ child:
 companion:
   name: "Mimo"
 ui:
-  max_hub_choices: 4
+  max_hub_choices: 5
   inactivity_seconds: 300
   pointer_visible: true
 activities:
@@ -30,3 +30,7 @@ paths:
   state_dir: .local/state
   content_dir: content/packs
   migrations_dir: migrations
+
+voice:
+  enabled: true
+  model_path: .local/models/vosk-model-small-en-us-0.15
