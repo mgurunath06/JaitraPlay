@@ -1,0 +1,11 @@
+[Unit]
+Description=Check JAITRA provider APIs every 30 minutes
+
+[Timer]
+OnCalendar=*-*-* *:00,30:00
+Persistent=true
+AccuracySec=1s
+Unit=jaitra-provider-health.service
+
+[Install]
+WantedBy=timers.target

@@ -235,3 +235,16 @@ preferences disable character animations.
 
 Answer tiles use a flexible two-column layout with wrapping labels. Home retains Setup and
 Exit app; each game has Exit to home instead of the administrative toolbar.
+
+## Provider API health checks
+
+Run all `.claude` provider text checks independently of the app:
+
+```bash
+bash deploy/scripts/check-provider-health.sh
+```
+
+The latest report is `.local/state/provider-health.json`. These are real, small
+text-generation requests and consume provider usage. A systemd timer can run them
+every 30 minutes, including when the app is closed. See
+[installation and report details](cloud.md#independent-provider-health-checks).

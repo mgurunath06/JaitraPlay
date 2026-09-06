@@ -1,0 +1,11 @@
+[Unit]
+Description=JAITRA provider text API health check
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=@REPOSITORY_ROOT@
+ExecStart=/bin/bash @REPOSITORY_ROOT@/deploy/scripts/check-provider-health.sh
+TimeoutStartSec=25min
+UMask=0077

@@ -382,3 +382,88 @@ Checks completed successfully on 2026-09-06 in the development workspace:
 
 Live paid providers and physical appliance checks were not performed. The smoke
 check establishes startup and snapshot delivery, not microphone recognition quality.
+
+## Independent provider health checks
+
+`deploy/scripts/check-provider-health.sh` runs without the app, `uv`, or optional
+Python packages. It recursively inspects every `*.json` in `.claude` each run, so
+new profiles are picked up automatically. It sends a minimal text-generation
+request per provider, not just a TCP ping. These requests consume provider usage.
+It does not test image generation or send child data.
+
+```bash
+bash deploy/scripts/check-provider-health.sh
+```
+
+Options: `--profiles-dir PATH`, `--output PATH`, and `--timeout SECONDS` (default 30,
+maximum 120 per request). Existing Anthropic-style `env.ANTHROPIC_BASE_URL` and
+`env.ANTHROPIC_AUTH_TOKEN` profiles are supported, with OpenRouter detected from
+its hostname. Optional `ANTHROPIC_MODEL` overrides the default `claude-sonnet-4-6`.
+OpenRouter defaults to `openrouter/auto`; `OPENAI_MODEL` can override it. Other
+OpenAI-compatible profiles require `OPENAI_BASE_URL`, `OPENAI_API_KEY`, and
+`OPENAI_MODEL` in `env`. Endpoints must use HTTPS; redirects are not followed.
+
+Every JSON is reported, including example profiles. JSON without recognized
+provider keys is skipped; malformed JSON or incomplete provider configuration
+fails. Success requires a nonempty text response. This confirms that configured
+text model's availability, not every possible capability or generated-content
+quality. An empty/missing directory is unhealthy. A directory listing/permission
+error or failure to save the report causes the command itself to fail.
+
+Output includes timestamp, profile filename, status, reason code, duration and
+HTTP error status where applicable. Tokens, URLs, prompts and response bodies are
+not logged. Latest results are atomically replaced in
+`.local/state/provider-health.json`; scheduled output is also in the systemd
+journal. Exit codes: 0 all tested profiles healthy; 1 a failure/no providers;
+2 another check already running (or invalid arguments). A filesystem lock prevents
+scheduled and on-demand runs from overlapping. Results are independent of the
+core's `/api/v1/health`; no UI integration or notification delivery is implemented.
+
+### Install on the existing shared Ubuntu checkout
+
+For `/opt/jaitraplay`, with `admin2` owning the runtime and both users in group
+`jaitra`, install a **system** timer running as `admin2`. This stays active without
+an interactive login and does not depend on the app launcher. From the checkout:
+
+```bash
+bash deploy/scripts/render-dev-units.sh
+sudo install -m 644 .local/systemd/jaitra-provider-health.service /etc/systemd/system/
+sudo install -m 644 .local/systemd/jaitra-provider-health.timer /etc/systemd/system/
+sudo mkdir -p /etc/systemd/system/jaitra-provider-health.service.d
+printf '[Service]\nUser=admin2\nGroup=jaitra\n' | sudo tee /etc/systemd/system/jaitra-provider-health.service.d/user.conf
+sudo systemctl daemon-reload
+sudo systemctl enable --now jaitra-provider-health.timer
+sudo systemctl start jaitra-provider-health.service
+```
+
+The timer runs at minute 00 and 30, catches a missed calendar run when activated,
+and survives reboot. The service has a 25-minute total deadline. It cannot run
+while the machine is off; network outages appear as failed probes. systemd
+continues scheduling after a failed check. Ensure `admin2` can read all profiles
+and write `.local/state`; installing the timer does not alter credential ownership.
+For a different appliance, substitute its runtime user/group in the override.
+
+On demand and diagnostics after installation:
+
+```bash
+sudo systemctl start jaitra-provider-health.service
+sudo journalctl -u jaitra-provider-health.service -n 100 --no-pager
+systemctl list-timers jaitra-provider-health.timer
+sudo -u admin2 cat /opt/jaitraplay/.local/state/provider-health.json
+```
+
+A failed service start can mean one provider failed; inspect the report for the
+individual results. To disable recurring calls:
+`sudo systemctl disable --now jaitra-provider-health.timer`.
+The templates can alternatively be installed as user units with the same renderer,
+without the system-level user override; continuous logged-out operation then
+requires that user's systemd manager to remain running.
+
+Validation of the checker on 2026-09-06: 35 Python tests passed (including nine
+provider-check tests), Ruff and mypy passed, shell syntax and rendered systemd
+unit validation passed. WSL's mounted filesystem produced unit-file mode warnings;
+the documented `install -m 644` command sets appropriate installed unit modes.
+A live on-demand run reported OpenRouter healthy, MWAPI HTTP 429, and StartupAPI
+timed out at 30 seconds. These are point-in-time observations from the development
+machine, not permanent provider status or Ubuntu connectivity results. The Ubuntu
+timer must still be installed there; adding source files does not enable it.
