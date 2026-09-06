@@ -54,6 +54,7 @@ class GeneratedQuestion(StrictModel):
 class TranscriptionRequest(StrictModel):
     audio: str = Field(min_length=4, max_length=1024000)
     sample_rate: Literal[16000, 44100, 48000] = Field(alias="sampleRate")
+    phrases: list[str] = Field(default=[], max_length=40)
 
 
 class StorybookCreateRequest(StrictModel):

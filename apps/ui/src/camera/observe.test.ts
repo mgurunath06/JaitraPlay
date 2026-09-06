@@ -35,4 +35,8 @@ describe("camera observations", () => {
     p[11].visibility = 0.1;
     expect(observe([p], [], [], 0).presence).toBe("Position uncertain");
   });
+  it("accepts moderately confident child poses", () => {
+    const p = pose(); p[11].visibility = p[12].visibility = 0.5;
+    expect(observe([p], [], [], 0).presence).toBe("One person visible");
+  });
 });

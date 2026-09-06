@@ -24,6 +24,7 @@ def create_app(runtime: CoreRuntime, *, manage_lifecycle: bool = True) -> FastAP
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         if manage_lifecycle:
             runtime.start()
+            runtime.start_background_services()
         yield
         if manage_lifecycle:
             runtime.stop()
@@ -34,7 +35,7 @@ def create_app(runtime: CoreRuntime, *, manage_lifecycle: bool = True) -> FastAP
     async def transcribe(request: TranscriptionRequest) -> dict[str, str]:
         try:
             text = await asyncio.to_thread(
-                runtime.voice.transcribe, request.audio, request.sample_rate
+                runtime.voice.transcribe, request.audio, request.sample_rate, request.phrases
             )
             return {"text": text}
         except VoiceUnavailable:
@@ -47,6 +48,8 @@ def create_app(runtime: CoreRuntime, *, manage_lifecycle: bool = True) -> FastAP
         return {
             "apiVersion": "1.0",
             "ready": runtime.health.ready,
+            "questionProvider": runtime.provider_availability.snapshot(),
+            "questionBank": runtime.question_bank.stats(),
             **runtime.health.model_dump(mode="json"),
         }
 

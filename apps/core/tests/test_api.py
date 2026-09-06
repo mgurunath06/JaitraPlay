@@ -67,7 +67,9 @@ def test_ai_question_route(config: AppConfig, repository_root: Path) -> None:
     runtime = CoreRuntime(config, repository_root=repository_root)
     runtime.start()
 
-    async def fake_generate(activity_id: str, _request: object) -> GeneratedQuestion:
+    async def fake_generate(
+        _provider: str, activity_id: str, _request: object
+    ) -> GeneratedQuestion:
         return GeneratedQuestion(
             activityId=activity_id,
             prompt="Find the elephant.",
@@ -83,7 +85,8 @@ def test_ai_question_route(config: AppConfig, repository_root: Path) -> None:
             provider="mwapi",
         )
 
-    runtime.questions.generate = fake_generate  # type: ignore[method-assign]
+    runtime.questions.generate_with = fake_generate  # type: ignore[method-assign]
+    runtime.provider_availability.mark_available("mwapi")
 
     async def exercise_api() -> None:
         transport = ASGITransport(app=create_app(runtime, manage_lifecycle=False))

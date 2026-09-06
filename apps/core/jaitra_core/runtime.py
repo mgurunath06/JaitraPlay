@@ -23,8 +23,14 @@ from jaitra_core.config import AppConfig
 from jaitra_core.content import ContentCatalog
 from jaitra_core.observability import ComponentHealth, HealthModel, HealthState, log_event
 from jaitra_core.persistence import Database
-from jaitra_core.providers import AiQuestionService, QuestionGenerationError, StorybookService
-from jaitra_core.providers.variety import local_question, repeats_question
+from jaitra_core.providers import (
+    AiQuestionService,
+    ProviderAvailabilityService,
+    QuestionBank,
+    QuestionGenerationError,
+    StorybookService,
+)
+from jaitra_core.providers.variety import repeats_question
 from jaitra_core.state import StateMachine, TransitionError
 from jaitra_core.voice import VoiceService
 
@@ -78,6 +84,10 @@ class CoreRuntime:
         )
         self.catalog = ContentCatalog(self._resolve(config.paths.content_dir))
         self.questions = AiQuestionService(repository_root)
+        self.question_bank = QuestionBank(state_dir / "question-bank")
+        self.provider_availability = ProviderAvailabilityService(
+            self.questions, state_dir
+        )
         self.storybooks = StorybookService(repository_root, state_dir)
         self._question_lock = asyncio.Lock()
         self.enabled_activities: list[str] = []
@@ -91,6 +101,7 @@ class CoreRuntime:
             if not self.database.integrity_check():
                 raise RuntimeError("database integrity check failed")
             self.health.storage = ComponentHealth(state=HealthState.HEALTHY)
+            self.question_bank.start()
 
             reports = self.catalog.load()
             valid_reports = [report for report in reports if report.valid]
@@ -117,7 +128,13 @@ class CoreRuntime:
                 logger, logging.ERROR, "CORE_FATAL", "runtime", reason_code="BOOTSTRAP_FAILED"
             )
 
+    def start_background_services(self) -> None:
+        if self.health.ready:
+            self.provider_availability.start()
+
     def stop(self) -> None:
+        self.provider_availability.stop()
+        self.question_bank.stop()
         self.storybooks.stop()
         self.database.close()
 
@@ -158,17 +175,19 @@ class CoreRuntime:
             # History belongs to the appliance, including questions from other games.
             recent = list(dict.fromkeys([item.prompt for item in history] + request.recent_prompts))
             adapted = request.model_copy(update={"recent_prompts": recent})
-            previous = next((item for item in history if item.activity_id == activity_id), None)
-            # Alternate curated interactive challenges with provider-generated quizzes.
-            if previous is not None and previous.provider != "local":
-                question = local_question(activity_id, history)
-            else:
+            provider = self.provider_availability.available_provider
+            if provider is not None:
                 try:
-                    question = await self.questions.generate(activity_id, adapted)
+                    question = await self.questions.generate_with(provider, activity_id, adapted)
                     if repeats_question(question, history, recent):
-                        raise QuestionGenerationError("repeated question")
+                        question = self.question_bank.take(activity_id, history)
+                    else:
+                        self.question_bank.record_displayed(question)
                 except QuestionGenerationError:
-                    question = local_question(activity_id, history)
+                    self.provider_availability.mark_failed(provider)
+                    question = self.question_bank.take(activity_id, history)
+            else:
+                question = self.question_bank.take(activity_id, history)
             self.database.record_question(activity_id, question.model_dump_json(by_alias=True))
             return question
 

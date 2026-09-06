@@ -114,6 +114,9 @@ h1 { font-size: clamp(42px, 6vw, 88px); line-height: 1.02; margin: 0 0 42px; let
 .setup-panel button { cursor: pointer; padding: 10px 14px; border-radius: 10px; margin: 4px; }
 .setup-panel button:disabled { cursor: default; opacity: .5; }
 .practice-prompt { background: #213f58; padding: 18px; border-radius: 12px; }
+.device-success { color: #86efac; font-weight: 700; }
+.zone-options { margin-top: 14px; }
+.zone-options summary { cursor: pointer; font-weight: 700; }
 .camera-frame { position: relative; width: 100%; background: #020617; margin-top: 10px; border-radius: 12px; overflow: hidden; }
 .camera-frame video { width: 100%; height: 100%; display: block; transform: scaleX(-1); }
 .camera-frame svg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }

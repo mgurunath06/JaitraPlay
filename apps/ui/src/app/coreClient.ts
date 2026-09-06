@@ -42,7 +42,7 @@ async function getQuestion(activityId: string, request: QuestionRequest): Promis
   return (await response.json()) as GeneratedQuestion;
 }
 
-async function transcribe(request: { audio: string; sampleRate: number }): Promise<{ text: string }> {
+async function transcribe(request: { audio: string; sampleRate: number; phrases?: string[] }): Promise<{ text: string }> {
   if (window.jaitra) return window.jaitra.transcribe(request);
   if (!import.meta.env.DEV) throw new Error("Electron bridge is unavailable");
   const response = await fetch("/api/v1/voice/transcribe", {

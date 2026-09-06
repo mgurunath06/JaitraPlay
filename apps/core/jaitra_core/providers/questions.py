@@ -25,7 +25,7 @@ class AiQuestionService:
 
     async def generate(self, activity_id: str, request: QuestionRequest) -> GeneratedQuestion:
         errors: list[str] = []
-        for name, profile_path in self._profile_paths():
+        for name, profile_path in self.profile_paths():
             try:
                 profile = self._load_profile(profile_path)
                 raw = await asyncio.to_thread(
@@ -41,7 +41,25 @@ class AiQuestionService:
                 )
         raise QuestionGenerationError(", ".join(errors) or "no AI provider profiles configured")
 
-    def _profile_paths(self) -> list[tuple[ProviderName, Path]]:
+    async def generate_with(
+        self, provider: ProviderName, activity_id: str, request: QuestionRequest
+    ) -> GeneratedQuestion:
+        paths = dict(self.profile_paths())
+        try:
+            profile = self._load_profile(paths[provider])
+            raw = await asyncio.to_thread(
+                self._request_provider, provider, profile, activity_id, request
+            )
+            return self._validate(raw, activity_id, provider)
+        except Exception as exc:
+            logger.warning(
+                "AI_QUESTION_PROVIDER_FAILED provider=%s error=%s",
+                provider,
+                type(exc).__name__,
+            )
+            raise QuestionGenerationError(f"{provider} request failed") from exc
+
+    def profile_paths(self) -> list[tuple[ProviderName, Path]]:
         root = self.repository_root / ".claude"
         startupapi = root / "settings.startupapi.json"
         if not startupapi.is_file():
@@ -101,7 +119,7 @@ class AiQuestionService:
             method="POST",
         )
         try:
-            with urllib.request.urlopen(http_request, timeout=30) as response:
+            with urllib.request.urlopen(http_request, timeout=10) as response:
                 result = json.loads(response.read())
         except (OSError, urllib.error.HTTPError, json.JSONDecodeError) as exc:
             raise QuestionGenerationError(f"{name} request failed") from exc

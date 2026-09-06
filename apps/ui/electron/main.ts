@@ -8,6 +8,7 @@ interface QuestionRequest {
   neededHint: boolean;
   recentPrompts: string[];
 }
+interface TranscriptionRequest { audio: string; sampleRate: number; phrases?: string[] }
 
 const directory = fileURLToPath(new URL(".", import.meta.url));
 const coreUrl = process.env.JAITRA_CORE_URL ?? "http://127.0.0.1:8765";
@@ -59,11 +60,12 @@ function installIpcHandlers(): void {
   ipcMain.handle("jaitra:transcribe", (event, request: unknown) => {
     if (event.sender !== mainWindow?.webContents || event.senderFrame !== mainWindow.webContents.mainFrame) throw new Error("Unknown sender");
     if (!request || typeof request !== "object") throw new Error("Invalid audio");
-    const { audio, sampleRate } = request as { audio: unknown; sampleRate: unknown };
-    if (typeof audio !== "string" || audio.length > 1024000 || ![16000, 44100, 48000].includes(Number(sampleRate))) throw new Error("Invalid audio");
+    const { audio, sampleRate, phrases } = request as { audio: unknown; sampleRate: unknown; phrases?: unknown };
+    const normalizedSampleRate = Number(sampleRate);
+    if (typeof audio !== "string" || audio.length > 1024000 || ![16000, 44100, 48000].includes(normalizedSampleRate) || (phrases !== undefined && (!Array.isArray(phrases) || phrases.length > 40 || phrases.some(phrase => typeof phrase !== "string" || phrase.length > 40)))) throw new Error("Invalid audio");
     return coreRequest("/api/v1/voice/transcribe", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ audio, sampleRate }),
+      body: JSON.stringify({ audio, sampleRate: normalizedSampleRate, phrases } satisfies TranscriptionRequest),
     }, 30000);
   });
   ipcMain.handle("jaitra:quit", () => app.quit());

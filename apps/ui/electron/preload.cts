@@ -8,7 +8,7 @@ interface QuestionRequest {
 }
 
 contextBridge.exposeInMainWorld("jaitra", {
-  transcribe: (request: { audio: string; sampleRate: number }) => ipcRenderer.invoke("jaitra:transcribe", request),
+  transcribe: (request: { audio: string; sampleRate: number; phrases?: string[] }) => ipcRenderer.invoke("jaitra:transcribe", request),
   quit: () => ipcRenderer.invoke("jaitra:quit"),
   getSnapshot: () => ipcRenderer.invoke("jaitra:get-snapshot"),
   sendCommand: (type: CommandType) => ipcRenderer.invoke("jaitra:send-command", type),

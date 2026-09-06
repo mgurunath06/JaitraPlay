@@ -22,11 +22,18 @@ export function encodePcm(chunks: Float32Array[], maxSamples: number): string {
 export async function recordVoice(signal: AbortSignal): Promise<Recording> {
   quietMimo();
   const deviceId = readSettings().microphoneId;
-  const stream = await navigator.mediaDevices.getUserMedia({ audio: { ...(deviceId ? { deviceId: { exact: deviceId } } : {}), channelCount: 1, echoCancellation: true, noiseSuppression: true }, video: false });
+  const audio = { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true };
+  let stream: MediaStream;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ audio: { ...audio, ...(deviceId ? { deviceId: { exact: deviceId } } : {}) }, video: false });
+  } catch (error) {
+    if (!deviceId || !(error instanceof DOMException) || !["NotFoundError", "OverconstrainedError"].includes(error.name)) throw error;
+    stream = await navigator.mediaDevices.getUserMedia({ audio, video: false });
+  }
   const closeTracks = () => stream.getTracks().forEach((track) => track.stop());
   if (signal.aborted) { closeTracks(); throw new Error("Cancelled"); }
   let context: AudioContext;
-  try { context = new AudioContext({ sampleRate: 16000 }); }
+  try { context = new AudioContext({ sampleRate: 16000, latencyHint: "interactive" }); }
   catch (error) { closeTracks(); throw error; }
   const chunks: Float32Array[] = [];
   let source: MediaStreamAudioSourceNode | undefined;

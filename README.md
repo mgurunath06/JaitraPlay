@@ -149,10 +149,10 @@ JAITRA_CONFIG=config.yaml uv run --extra voice jaitra-core
 The systemd core launcher includes the voice extra. In development, run Vite and Electron
 as described above. Use `--extra voice` with `uv run` to keep the optional package installed.
 
-In Picture Guess, Colour Quest quizzes, or Riddle Garden, select **Say my answer**, speak an
-answer such as “blue”, “elephant”, or “three”, then select **Stop listening**. Recording stops
-automatically after eight seconds. Check the displayed transcript and select **Use this answer**
-to submit it. Ambiguous answers do not select a choice. Touch controls always remain available.
+In Picture Guess, Colour Quest quizzes, or Riddle Garden, select **Speak answer** and say one
+visible answer such as “blue”, “elephant”, or “three”. Listening stops after four seconds and a
+clear match is submitted automatically. Recognition is limited to the visible choices, improving
+accuracy and preventing unrelated speech from selecting an answer. Touch controls remain available.
 Memory cards and room hunts currently use touch controls.
 
 Microphone access is requested only after selecting the voice button. Recording stops on leaving
@@ -171,15 +171,16 @@ the actual appliance. Missing/denied microphones show a retry message instead of
 
 Use **Setup** in the top bar, including from the recovery screen. It provides:
 
-- Microphone selection and guided practice starting with Mimo, plus blue, red, three, elephant, and circle.
-- **Teach this answer** to save an explicitly confirmed transcription correction on this
+- A two-step microphone and camera test with optional device selection.
+- **Save correction** to save an explicitly confirmed transcription correction on this
   device. Corrections apply only to matching choices in a quiz and never override an existing
   direct match. This is vocabulary correction, not acoustic-model fine-tuning. Clear corrections
   at any time. No voice recordings are retained.
-- Camera selection, mirrored preview, and **Start camera / Stop camera** controls.
+- Camera selection, mirrored preview, and **Test camera / Stop camera** controls. CPU processing
+  is used for the setup test; pose confidence is tuned for children and partial framing.
 - Presence, mirrored left/centre/right screen position, a raised hand, both hands raised,
   and a wave (repeated side-to-side wrist movement).
-- Up to eight named room zones. With the camera fixed, draw rectangles over floor areas in
+- An optional collapsed section for up to eight named room zones. With the camera fixed, draw rectangles over floor areas in
   the preview. Zone detection uses the visible ankle midpoint; keep the whole body in view.
   Hidden feet and overlapping zones produce an unknown/uncertain result. These are approximate
   image-based room zones, not metric 3D tracking. Re-mark zones after moving the camera.
@@ -237,6 +238,19 @@ Answer tiles use a flexible two-column layout with wrapping labels. Home retains
 Exit app; each game has Exit to home instead of the administrative toolbar.
 
 ## Provider API health checks
+
+Question delivery does not probe providers. The core keeps the latest routing flag in
+`.local/state/question-provider-status.json`; a background monitor checks each configured
+provider every five minutes and selects the first healthy provider in MWAPI, StartupAPI,
+OpenRouter order. If generation fails, that provider is removed from routing immediately and
+questions come from the local bank until a background check finds a healthy provider.
+
+The persistent fallback bank is `.local/state/question-bank/questions.json`. On startup it
+contains 220 unseen questions for each of the four question games. Its background builder
+refills a game before its unseen count can fall below 200. Displayed and unseen records share
+a hard cap of 1,000; the oldest displayed records are rotated out first. Current provider and
+bank counts are also available from `GET /api/v1/health` as `questionProvider` and
+`questionBank`.
 
 Run all `.claude` provider text checks independently of the app:
 

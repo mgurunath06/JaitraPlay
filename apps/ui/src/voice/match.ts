@@ -1,6 +1,10 @@
 import type { GeneratedQuestion } from "../../../../packages/contracts/src";
 export const clean = (text: string) => text.toLowerCase().replace(/[_-]/g, " ").replace(/[^a-z0-9 ]/g, "").replace(/\s+/g, " ").trim();
 const numbers: Record<string, string> = { zero: "0", one: "1", two: "2", three: "3", four: "4", five: "5", six: "6", seven: "7", eight: "8", nine: "9", ten: "10" };
+const spokenNumbers = Object.fromEntries(Object.entries(numbers).map(([word, digit]) => [digit, word]));
+export function recognitionPhrases(choices: GeneratedQuestion["choices"]): string[] {
+  return [...new Set(choices.flatMap(choice => [choice.value, choice.label]).map(clean).filter(Boolean).flatMap(phrase => [phrase, spokenNumbers[phrase]].filter((value): value is string => Boolean(value))))];
+}
 export function matchAnswer(text: string, choices: GeneratedQuestion["choices"], aliases: Record<string, string> = {}): string | null {
   const normalized = clean(text).split(" ").map((word) => numbers[word] ?? word).join(" ");
   const matches = choices.filter((choice) => [clean(choice.value), clean(choice.label)].some((alias) =>

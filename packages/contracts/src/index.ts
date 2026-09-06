@@ -50,6 +50,7 @@ export interface QuestionRequest {
 export interface TranscriptionRequest {
   audio: string;
   sampleRate: number;
+  phrases?: string[];
 }
 
 export type StorybookStatus = "planning" | "illustrating" | "ready" | "failed";

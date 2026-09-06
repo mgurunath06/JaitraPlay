@@ -7,7 +7,7 @@ export interface Observation {
   gesture: string;
 }
 export interface WristSample { time: number; left: number | null; right: number | null }
-const visible = (p?: Landmark) => Boolean(p && (p.visibility ?? 0) >= 0.65 && p.x >= 0 && p.x <= 1 && p.y >= 0 && p.y <= 1);
+const visible = (p?: Landmark) => Boolean(p && (p.visibility ?? 0) >= 0.45 && p.x >= 0 && p.x <= 1 && p.y >= 0 && p.y <= 1);
 function waving(history: WristSample[], hand: "left" | "right", now: number): boolean {
   const recent = history.filter((sample) => now - sample.time < 1800);
   let previous: number | null = null;

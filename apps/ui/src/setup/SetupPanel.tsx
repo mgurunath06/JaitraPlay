@@ -32,8 +32,8 @@ export function SetupPanel({ onClose }: { onClose: () => void }) {
     void coreClient.getSnapshot().then(snapshot => {
       if (!active) return;
       const ready = snapshot.payload.capabilities.voice === "AVAILABLE";
-      setVoiceReady(ready); setStatus(ready ? "Local voice recognition ready" : "Voice is not ready. Install the speech model, enable voice in config.yaml, and restart the core.");
-    }).catch(() => { if (active) setStatus("Cannot reach the core. Start it, then reopen Setup to retry voice practice."); });
+      setVoiceReady(ready); setStatus(ready ? "Microphone recognition is ready." : "Voice recognition is off. Install the speech model and restart the app.");
+    }).catch(() => { if (active) setStatus("The app core is not running. Restart the app, then test again."); });
     if (navigator.mediaDevices?.enumerateDevices) void navigator.mediaDevices.enumerateDevices().then(items => { if (active) setDevices(items); }).catch(() => {});
     return () => { active = false; };
   }, []);
@@ -43,34 +43,31 @@ export function SetupPanel({ onClose }: { onClose: () => void }) {
   };
   return <div className="setup-overlay">
     <section className="setup-panel" role="dialog" aria-modal="true" aria-labelledby="setup-title" onKeyDown={trapFocus}>
-      <header className="setup-header"><div><p className="eyebrow">Grown-up controls</p><h1 id="setup-title">Voice & camera setup</h1></div><button autoFocus className="back-button" onClick={onClose}>Close setup</button></header>
-      <p>Practise from the usual playing spot. Save word corrections and mark room zones. Audio and video are not recorded to disk.</p>
+      <header className="setup-header"><div><p className="eyebrow">Quick device check</p><h1 id="setup-title">Voice & camera setup</h1></div><button autoFocus className="back-button" onClick={onClose}>Done</button></header>
+      <p>Choose each device and test it once. Nothing is recorded or saved.</p>
       <div className="setup-columns">
         <section aria-labelledby="voice-setup-title">
-          <h2 id="voice-setup-title">Voice practice & corrections</h2>
+          <h2 id="voice-setup-title">1. Test the microphone</h2>
           <p>{status}</p>
           <label>Microphone <select value={settings.microphoneId} onChange={event => { update({ ...settings, microphoneId: event.target.value }); setHeard(""); setSuccess(false); }}><option value="">System default</option>{devices.filter(d => d.kind === "audioinput" && d.deviceId).map((device, i) => <option key={device.deviceId} value={device.deviceId}>{device.label || `Microphone ${i + 1}`}</option>)}</select></label>
-          <label>Practice word <select value={word} onChange={event => { setWord(event.target.value); setHeard(""); setSuccess(false); }}>{words.map(w => <option key={w} value={w}>{w === "mimo" ? "Mimo" : w}</option>)}</select></label>
-          <p className="practice-prompt">Say: <strong>{word === "mimo" ? "Mimo" : word}</strong></p>
-          {voiceReady && <VoiceAnswer key={`${word}-${settings.microphoneId}`} useCorrections={false} choices={[{ value: word === "three" ? "3" : word, label: word, color: null }]} onTranscript={text => { setHeard(text); setSuccess(false); void refreshDevices(); }} onAnswer={() => setSuccess(true)} />}
-          {success && <p role="status">Recognised and confirmed. Try another word.</p>}
-          {heard && <div className="teach-word"><p>Only if the child said “{word}”: save “{heard}” as that answer?</p><button disabled={!clean(heard) || clean(heard).length > 80 || (words.includes(clean(heard)) && clean(heard) !== word)} onClick={() => {
+          <label>Test word <select value={word} onChange={event => { setWord(event.target.value); setHeard(""); setSuccess(false); }}>{words.map(w => <option key={w} value={w}>{w === "mimo" ? "Mimo" : w}</option>)}</select></label>
+          <p className="practice-prompt">Press the microphone and say <strong>{word === "mimo" ? "Mimo" : word}</strong> once.</p>
+          {voiceReady && <VoiceAnswer key={`${word}-${settings.microphoneId}`} constrainRecognition={false} useCorrections={false} choices={[{ value: word === "three" ? "3" : word, label: word, color: null }]} onTranscript={text => { setHeard(text); setSuccess(false); void refreshDevices(); }} onAnswer={() => setSuccess(true)} />}
+          {success && <p className="device-success" role="status">✓ Voice recognised correctly.</p>}
+          {heard && !success && <div className="teach-word"><p>Heard “{heard}”. If the child really said “{word}”, save this correction.</p><button disabled={!clean(heard) || clean(heard).length > 80 || (words.includes(clean(heard)) && clean(heard) !== word)} onClick={() => {
             update({ ...settings, voiceAliases: { ...settings.voiceAliases, [clean(heard)]: word === "three" ? "3" : word } });
             setHeard("");
-          }}>Teach this answer</button></div>}
-          <p>Teaching saves an exact word correction, not a new speech model. Only saved corrections are retained; practice transcripts are otherwise discarded.</p>
-          <p>{Object.keys(settings.voiceAliases).length} saved corrections</p>
-          <button onClick={() => update({ ...settings, voiceAliases: {} })}>Clear voice corrections</button>
+          }}>Save correction</button></div>}
+          {Object.keys(settings.voiceAliases).length > 0 && <button onClick={() => update({ ...settings, voiceAliases: {} })}>Clear {Object.keys(settings.voiceAliases).length} saved voice fixes</button>}
         </section>
         <section aria-labelledby="camera-setup-title">
-          <h2 id="camera-setup-title">Camera, room zones & gestures</h2>
+          <h2 id="camera-setup-title">2. Test the camera</h2>
           <label>Camera <select value={settings.cameraId} onChange={event => update({ ...settings, cameraId: event.target.value, zones: [] })}><option value="">System default</option>{devices.filter(d => d.kind === "videoinput" && d.deviceId).map((device, i) => <option key={device.deviceId} value={device.deviceId}>{device.label || `Camera ${i + 1}`}</option>)}</select></label>
-          <label>Camera processing <select value={settings.preferGpu ? "gpu" : "cpu"} onChange={event => update({ ...settings, preferGpu: event.target.value === "gpu" })}><option value="cpu">CPU — development or any machine</option><option value="gpu">Try GPU, fall back to CPU</option></select></label>
-          <p>Raise one hand, both hands, or wave side to side. Include only one person for unambiguous feedback.</p>
-          <CameraPanel settings={settings} onZones={zones => update({ ...settings, zones })} onStarted={() => void refreshDevices()} />
+          <p>Press Test camera, stand in the frame, and raise one hand.</p>
+          <CameraPanel settings={settings} simple onZones={zones => update({ ...settings, zones })} onStarted={() => void refreshDevices()} />
         </section>
       </div>
-      <footer><button onClick={() => void refreshDevices()}>Refresh devices</button><span role="status">{message}</span><p>After setup, use Camera view on the home screen to check gestures. Inside a game, Exit to home brings you back here.</p></footer>
+      <footer><button onClick={() => void refreshDevices()}>Refresh device list</button><span role="status">{message}</span></footer>
     </section>
   </div>;
 }

@@ -3,7 +3,7 @@ import type { SetupSettings, Zone } from "../setup/settings";
 import { observe, type Landmark, type Observation, type WristSample } from "./observe";
 
 const empty: Observation = { presence: "No person visible", position: "Unknown", zone: "Unknown", gesture: "No gesture" };
-export function CameraPanel({ settings, onZones, onStarted }: { settings: SetupSettings; onZones?: (zones: Zone[]) => void; onStarted?: () => void }) {
+export function CameraPanel({ settings, onZones, onStarted, simple = false }: { settings: SetupSettings; onZones?: (zones: Zone[]) => void; onStarted?: () => void; simple?: boolean }) {
   const video = useRef<HTMLVideoElement>(null);
   const stream = useRef<MediaStream | null>(null);
   const worker = useRef<Worker | null>(null);
@@ -45,7 +45,14 @@ export function CameraPanel({ settings, onZones, onStarted }: { settings: SetupS
     const history: WristSample[] = [];
     const fail = (message: string) => { if (generation.current === token) { stop(); setError(message); } };
     try {
-      const media = await navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 640 }, height: { ideal: 480 }, ...(settings.cameraId ? { deviceId: { exact: settings.cameraId } } : {}) }, audio: false });
+      const videoConstraints = { width: { ideal: 640 }, height: { ideal: 480 } };
+      let media: MediaStream;
+      try {
+        media = await navigator.mediaDevices.getUserMedia({ video: { ...videoConstraints, ...(settings.cameraId ? { deviceId: { exact: settings.cameraId } } : {}) }, audio: false });
+      } catch (mediaError) {
+        if (!settings.cameraId || !(mediaError instanceof DOMException) || !["NotFoundError", "OverconstrainedError"].includes(mediaError.name)) throw mediaError;
+        media = await navigator.mediaDevices.getUserMedia({ video: videoConstraints, audio: false });
+      }
       if (generation.current !== token) { media.getTracks().forEach(track => track.stop()); return; }
       stream.current = media;
       media.getVideoTracks().forEach(track => track.addEventListener("ended", () => fail("Camera disconnected. Reconnect it and try again.")));
@@ -88,12 +95,12 @@ export function CameraPanel({ settings, onZones, onStarted }: { settings: SetupS
           frameTimer.current = window.setTimeout(() => void sendFrame(), 200);
         }
       };
-      process.postMessage({ type: "init", preferGpu: settings.preferGpu });
+      process.postMessage({ type: "init", preferGpu: simple ? false : settings.preferGpu });
     } catch { fail("Camera unavailable. Allow camera access, check the selected device, and try again."); }
   };
   return <section className="camera-panel" aria-label="Camera observation">
     <div className="camera-controls">
-      <button className="hint-button" onClick={() => state === "off" ? void start() : stop()}>{state === "off" ? "Start camera" : "Stop camera"}</button>
+      <button className="hint-button" onClick={() => state === "off" ? void start() : stop()}>{state === "off" ? (simple ? "Test camera" : "Start camera") : "Stop camera"}</button>
       <span>{state === "on" ? `Camera on · ${backend}` : state === "starting" ? "Starting camera…" : "Camera off"}</span>
     </div>
     {error && <p role="alert">{error}</p>}
@@ -115,17 +122,17 @@ export function CameraPanel({ settings, onZones, onStarted }: { settings: SetupS
     </div>
     <div className="camera-readout" aria-live="polite">
       <strong>{observation.presence}</strong>
-      <span>Screen position: {observation.position}</span>
-      <span>Room zone: {observation.zone}</span>
       <span>Gesture: {observation.gesture}</span>
+      {!simple && <span>Screen position: {observation.position}</span>}
+      {!simple && <span>Room zone: {observation.zone}</span>}
     </div>
-    {onZones && <div className="zone-editor">
+    {onZones && <details className="zone-options"><summary>Optional: set room zones</summary><div className="zone-editor">
       <p>Keep the camera fixed and show the whole body, including feet. Name a floor area, then mark its opposite corners on the mirrored preview.</p>
       <label>Room zone name <input maxLength={30} value={zoneName} onChange={event => setZoneName(event.target.value)} placeholder="e.g. Play mat" /></label>
       <button disabled={state !== "on" || !zoneName.trim() || settings.zones.length >= 8} onClick={() => { setDrawing(!drawing); setCorner(null); }}>{drawing ? "Cancel marking" : "Mark room zone"}</button>
       {drawing && <p role="status">{corner ? "Click the opposite corner." : "Click the first corner of the floor area."}</p>}
       {settings.zones.map(zone => <div key={zone.id}>{zone.name} <button aria-label={`Remove ${zone.name}`} onClick={() => onZones(settings.zones.filter(z => z.id !== zone.id))}>Remove</button></div>)}
-    </div>}
-    <p className="camera-note">Approximate position of a visible person, not identity or distance. No video is saved. Moving the camera requires new room zones.</p>
+    </div></details>}
+    <p className="camera-note">{simple ? "When you see “One person visible” and “Hand raised”, the camera is ready." : "Approximate position of a visible person, not identity or distance. No video is saved. Moving the camera requires new room zones."}</p>
   </section>;
 }

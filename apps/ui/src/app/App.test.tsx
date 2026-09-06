@@ -180,8 +180,8 @@ describe("child shell", () => {
     fireEvent.click(screen.getByRole("button", { name: "Setup" }));
     await act(async () => Promise.resolve());
     expect(screen.getByRole("dialog", { name: "Voice & camera setup" })).toBeVisible();
-    expect(screen.getByRole("button", { name: "Start camera" })).toBeVisible();
-    expect(screen.getByText(/Cannot reach the core/)).toBeVisible();
+    expect(screen.getByRole("button", { name: "Test camera" })).toBeVisible();
+    expect(screen.getByText(/core is not running/)).toBeVisible();
     fireEvent.keyDown(window, { key: "Escape" });
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(screen.queryByRole("alertdialog")).toBeNull();

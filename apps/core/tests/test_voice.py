@@ -1,4 +1,5 @@
 import base64
+import json
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -23,9 +24,12 @@ def test_transcription_preserves_segments_and_validates_audio(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    grammars: list[str | None] = []
+
     class Recognizer:
-        def __init__(self, _model: object, rate: int) -> None:
+        def __init__(self, _model: object, rate: int, grammar: str | None = None) -> None:
             assert rate == 16000
+            grammars.append(grammar)
 
         def AcceptWaveform(self, _audio: bytes) -> bool:
             return True
@@ -43,7 +47,10 @@ def test_transcription_preserves_segments_and_validates_audio(
     service = VoiceService(tmp_path, True)
     service.start()
     assert service.available
-    assert service.transcribe(base64.b64encode(bytes(100)).decode(), 16000) == "blue circle"
+    assert service.transcribe(
+        base64.b64encode(bytes(100)).decode(), 16000, ["Blue", "circle", "blue", "🐘"]
+    ) == "blue circle"
+    assert json.loads(grammars[0] or "[]") == ["blue", "circle", "[unk]"]
     for audio in (
         "!!!!",
         "",

@@ -41,7 +41,53 @@ RIDDLES = [
     ("hat", "👒", "Wear me on your head to shade your face. What am I?"),
     ("scissors", "✂️", "I have two blades and cut paper. An adult helps you use me."),
     ("bed", "🛏️", "You lie on me to sleep at night. What am I?"),
+    ("cup", "🥤", "You pour a drink into me. What am I?"),
+    ("plate", "🍽️", "Your food sits on me at mealtime. What am I?"),
+    ("chair", "🪑", "I have a seat and a back, and you sit on me. What am I?"),
+    ("lamp", "💡", "I make a room brighter when it is dark. What am I?"),
+    ("door", "🚪", "Open me to enter or leave a room. What am I?"),
+    ("window", "🪟", "You can see outside through my glass. What am I?"),
+    ("soap", "🧼", "Use me with water to wash away dirt. What am I?"),
+    ("towel", "🧻", "I help dry you after washing. What am I?"),
+    ("comb", "🪮", "My teeth help tidy your hair. What am I?"),
+    ("sock", "🧦", "You wear me between your foot and your shoe. What am I?"),
+    ("glove", "🧤", "I cover your hand and keep it warm. What am I?"),
+    ("backpack", "🎒", "I ride on your back and carry your things. What am I?"),
+    ("crayon", "🖍️", "Children use me to make colourful drawings. What am I?"),
+    ("ruler", "📏", "I am straight and help measure length. What am I?"),
+    ("bell", "🔔", "Shake or ring me and I make a bright sound. What am I?"),
+    ("camera", "📷", "I capture a picture for you to keep. What am I?"),
+    ("phone", "📱", "You can use me to talk to someone far away. What am I?"),
+    ("train", "🚂", "I travel on rails and pull carriages. What am I?"),
+    ("boat", "⛵", "I carry people across water. What am I?"),
+    ("airplane", "✈️", "I have wings and carry people through the sky. What am I?"),
+    ("bicycle", "🚲", "I have two wheels and pedals. What am I?"),
+    ("apple", "🍎", "I am a crunchy fruit that can be red or green. What am I?"),
+    ("banana", "🍌", "I am a long yellow fruit with a peel. What am I?"),
+    ("carrot", "🥕", "I am an orange vegetable that grows underground. What am I?"),
+    ("bread", "🍞", "I am baked in a loaf and can become toast. What am I?"),
+    ("sun", "☀️", "I shine in the daytime and warm the Earth. What am I?"),
+    ("moon", "🌙", "You often see me glowing in the night sky. What am I?"),
+    ("cloud", "☁️", "I float in the sky and can bring rain. What am I?"),
 ]
+
+PROMPT_OPENERS = {
+    "picture_guess": ("", "Picture puzzle: ", "Look and answer: "),
+    "colours_shapes": (
+        "", "Colour challenge: ", "Look closely: ", "Mimo asks: ", "Try this: ",
+        "Colour explorer: ", "Shape and colour time: ",
+    ),
+    "memory_cards": (
+        "", "Memory mission: ", "Matching time: ", "Find the pairs: ",
+        "Picture memory: ", "Mimo's match: ", "Ready to remember? ", "Pair puzzle: ",
+        "Memory challenge: ", "Turn and match: ", "Match-up game: ", "Remember these: ",
+        "Can you match them? ", "Memory warm-up: ", "Pair-finding time: ",
+        "Use your memory: ", "Where are the pairs? ", "Match every picture: ",
+    ),
+    "riddle_guess": ("", "Riddle time: ", "Solve this: ", "Mimo's riddle: ",
+                     "What could it be? ", "Listen closely: ", "Guess this: ",
+                     "Mystery object: ", "Use the clues: "),
+}
 
 
 def normalized(prompt: str) -> str:
@@ -63,7 +109,7 @@ def repeats_question(
     return any(old.answer == question.answer and old.kind == question.kind for old in history[:12])
 
 
-def local_question(activity_id: str, history: list[GeneratedQuestion]) -> GeneratedQuestion:
+def local_question_candidates(activity_id: str) -> list[GeneratedQuestion]:
     candidates: list[GeneratedQuestion] = []
 
     def add(
@@ -191,6 +237,17 @@ def local_question(activity_id: str, history: list[GeneratedQuestion]) -> Genera
             )
     else:
         raise ValueError("unsupported activity")
+
+    expanded: list[GeneratedQuestion] = []
+    for candidate in candidates:
+        for opener in PROMPT_OPENERS[activity_id]:
+            prompt = f"{opener}{candidate.prompt}"
+            expanded.append(candidate.model_copy(update={"prompt": prompt}))
+    return expanded
+
+
+def local_question(activity_id: str, history: list[GeneratedQuestion]) -> GeneratedQuestion:
+    candidates = local_question_candidates(activity_id)
 
     # Use unseen prompts first, then the least recently seen when a finite pool is exhausted.
     seen = {normalized(q.prompt): i for i, q in reversed(list(enumerate(history)))}

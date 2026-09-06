@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen, cleanup } from "@testing-library/react"
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { coreClient } from "../app/coreClient";
 import { VoiceAnswer } from "./VoiceAnswer";
-import { matchAnswer } from "./match";
+import { matchAnswer, recognitionPhrases } from "./match";
 import { encodePcm, recordVoice } from "./record";
 import type * as RecordingModule from "./record";
 vi.mock("./record", async (original) => ({ ...await original<typeof RecordingModule>(), recordVoice: vi.fn() }));
@@ -20,38 +20,38 @@ describe("voice answers", () => {
     expect(matchAnswer("blue or red", choices)).toBeNull();
     expect(matchAnswer("blueberry", choices)).toBeNull();
     expect(matchAnswer("", choices)).toBeNull();
+    expect(recognitionPhrases(choices)).toEqual(["blue", "red", "3", "three"]);
   });
   it("encodes bounded little-endian PCM", () => {
     const audio = atob(encodePcm([new Float32Array([-1, 0, 1, 1])], 3));
     expect([...audio].map((value) => value.charCodeAt(0))).toEqual([0, 128, 0, 0, 255, 127]);
   });
-  it("requires confirmation before choosing an answer and stops the microphone", async () => {
+  it("uses visible choices to recognise and submit one spoken answer", async () => {
     const stop = vi.fn().mockResolvedValue({ audio: "AAAA", sampleRate: 16000 });
     vi.mocked(recordVoice).mockResolvedValue({ stop, cancel: vi.fn() });
     vi.spyOn(coreClient, "transcribe").mockResolvedValue({ text: "blue" });
     const onAnswer = vi.fn();
     render(<VoiceAnswer choices={choices} onAnswer={onAnswer} />);
-    fireEvent.click(screen.getByRole("button", { name: /Say my answer/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Speak answer/ }));
     await act(async () => Promise.resolve());
-    fireEvent.click(screen.getByRole("button", { name: "Stop listening" }));
+    fireEvent.click(screen.getByRole("button", { name: "Stop now" }));
     await act(async () => Promise.resolve());
     expect(stop).toHaveBeenCalledOnce();
-    expect(onAnswer).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole("button", { name: "Use this answer" }));
     expect(onAnswer).toHaveBeenCalledWith("blue");
+    expect(coreClient.transcribe).toHaveBeenCalledWith(expect.objectContaining({ phrases: ["blue", "red", "3", "three"] }));
   });
-  it("stops after eight seconds and cancels on leaving the round", async () => {
+  it("stops after four seconds and cancels on leaving the round", async () => {
     vi.useFakeTimers();
     const cancel = vi.fn();
     const stop = vi.fn().mockResolvedValue({ audio: "AAAA", sampleRate: 16000 });
     vi.mocked(recordVoice).mockResolvedValue({ stop, cancel });
     vi.spyOn(coreClient, "transcribe").mockResolvedValue({ text: "" });
     const { unmount } = render(<VoiceAnswer choices={choices} onAnswer={vi.fn()} />);
-    fireEvent.click(screen.getByRole("button", { name: /Say my answer/ }));
-    await act(async () => { await vi.advanceTimersByTimeAsync(8000); });
+    fireEvent.click(screen.getByRole("button", { name: /Speak answer/ }));
+    await act(async () => { await vi.advanceTimersByTimeAsync(4000); });
     expect(stop).toHaveBeenCalledOnce();
     expect(screen.getByRole("status")).toHaveTextContent("didn’t hear");
-    fireEvent.click(screen.getByRole("button", { name: /Say my answer/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Speak answer/ }));
     await act(async () => Promise.resolve());
     unmount();
     expect(cancel).toHaveBeenCalled();
@@ -59,15 +59,15 @@ describe("voice answers", () => {
   it("handles denied permission and ignores a result after exit", async () => {
     vi.mocked(recordVoice).mockRejectedValueOnce(new Error("denied"));
     render(<VoiceAnswer choices={choices} onAnswer={vi.fn()} />);
-    fireEvent.click(screen.getByRole("button", { name: /Say my answer/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Speak answer/ }));
     await act(async () => Promise.resolve());
     expect(screen.getByRole("status")).toHaveTextContent("Microphone unavailable");
     const cancel = vi.fn();
     vi.mocked(recordVoice).mockResolvedValue({ stop: vi.fn(), cancel });
-    fireEvent.click(screen.getByRole("button", { name: /Say my answer/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Speak answer/ }));
     await act(async () => Promise.resolve());
     act(() => { window.dispatchEvent(new Event("jaitra:pause-voice")); });
     expect(cancel).toHaveBeenCalled();
-    expect(screen.queryByRole("button", { name: "Stop listening" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Stop now" })).toBeNull();
   });
 });

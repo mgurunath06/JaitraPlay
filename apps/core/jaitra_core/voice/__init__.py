@@ -6,6 +6,7 @@ import base64
 import binascii
 import importlib
 import json
+import re
 import threading
 from pathlib import Path
 from typing import Any
@@ -35,7 +36,9 @@ class VoiceService:
             # A missing package/model must not prevent touch-based games from starting.
             self.available = False
 
-    def transcribe(self, encoded: str, sample_rate: int) -> str:
+    def transcribe(
+        self, encoded: str, sample_rate: int, phrases: list[str] | None = None
+    ) -> str:
         if not self.available:
             raise VoiceUnavailable("VOICE_UNAVAILABLE")
         try:
@@ -48,7 +51,12 @@ class VoiceService:
             raise VoiceUnavailable("VOICE_BUSY")
         try:
             vosk = importlib.import_module("vosk")
-            recognizer = vosk.KaldiRecognizer(self._model, sample_rate)
+            grammar = self._grammar(phrases or [])
+            recognizer = (
+                vosk.KaldiRecognizer(self._model, sample_rate, json.dumps([*grammar, "[unk]"]))
+                if grammar
+                else vosk.KaldiRecognizer(self._model, sample_rate)
+            )
             parts: list[str] = []
             for offset in range(0, len(audio), 8000):
                 if recognizer.AcceptWaveform(audio[offset : offset + 8000]):
@@ -57,3 +65,13 @@ class VoiceService:
             return " ".join(part for part in parts if part).strip()
         finally:
             self._lock.release()
+
+    @staticmethod
+    def _grammar(phrases: list[str]) -> list[str]:
+        cleaned = []
+        for phrase in phrases[:40]:
+            value = re.sub(r"[^a-z0-9' ]", " ", phrase.casefold())
+            value = " ".join(value.split())[:40]
+            if value and value not in cleaned:
+                cleaned.append(value)
+        return cleaned

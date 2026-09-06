@@ -72,6 +72,42 @@ def test_offline_games_and_history_retention(config: AppConfig, repository_root:
             records = runtime.database.recent_questions()
             assert len(records) == 120
             assert len({json.loads(raw)["prompt"] for raw in records}) == 120
+            bank = runtime.question_bank.stats()
+            assert bank["total"] <= 1000
+            assert all(
+                count >= 200
+                for count in bank["undisplayedByActivity"].values()  # type: ignore[union-attr]
+            )
+        finally:
+            runtime.stop()
+
+    anyio.run(exercise)
+
+
+def test_failed_provider_is_not_retried_by_the_next_question(
+    config: AppConfig, repository_root: Path
+) -> None:
+    async def exercise() -> None:
+        runtime = CoreRuntime(config, repository_root=repository_root)
+        runtime.start()
+        calls = 0
+
+        async def unavailable(
+            _provider: str, _activity: str, _request: QuestionRequest
+        ) -> GeneratedQuestion:
+            nonlocal calls
+            calls += 1
+            raise QuestionGenerationError("offline")
+
+        runtime.questions.generate_with = unavailable  # type: ignore[method-assign]
+        runtime.provider_availability.mark_available("mwapi")
+        try:
+            first = await runtime.generate_question("picture_guess", QuestionRequest())
+            second = await runtime.generate_question("picture_guess", QuestionRequest())
+            assert first.provider == "local"
+            assert second.provider == "local"
+            assert calls == 1
+            assert runtime.provider_availability.available_provider is None
         finally:
             runtime.stop()
 
