@@ -84,7 +84,7 @@
           "args": ["-lc"]
         }
       },
-      "dependsOn": ["JAITRA: Vite"],
+      "dependsOn": ["JAITRA: Core", "JAITRA: Vite"],
       "dependsOrder": "sequence",
       "problemMatcher": [],
       "presentation": {
@@ -100,8 +100,8 @@
     },
     {
       "label": "JAITRA Play: Run all",
-      "dependsOn": ["JAITRA: Core", "JAITRA: Electron"],
-      "dependsOrder": "parallel",
+      "dependsOn": ["JAITRA: Electron"],
+      "dependsOrder": "sequence",
       "problemMatcher": [],
       "group": {
         "kind": "build",

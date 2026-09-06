@@ -15,6 +15,7 @@ contextBridge.exposeInMainWorld("jaitra", {
   getQuestion: (activityId: string, request: QuestionRequest) =>
     ipcRenderer.invoke("jaitra:get-question", activityId, request),
   createStorybook: (topic: string | null) => ipcRenderer.invoke("jaitra:create-storybook", topic),
+  listStorybooks: () => ipcRenderer.invoke("jaitra:list-storybooks"),
   getStorybook: (storyId: string) => ipcRenderer.invoke("jaitra:get-storybook", storyId),
   getStorybookImage: (storyId: string, pageNumber: number) =>
     ipcRenderer.invoke("jaitra:get-storybook-image", storyId, pageNumber),

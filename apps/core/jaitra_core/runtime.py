@@ -17,6 +17,7 @@ from jaitra_core.api.models import (
     QuestionRequest,
     SnapshotPayload,
     StateSnapshot,
+    StorybookLibraryItem,
     StorybookSnapshot,
 )
 from jaitra_core.config import AppConfig
@@ -196,6 +197,9 @@ class CoreRuntime:
 
     def storybook(self, story_id: str) -> StorybookSnapshot:
         return self.storybooks.get(story_id)
+
+    def storybook_library(self) -> list[StorybookLibraryItem]:
+        return self.storybooks.list_books()
 
     def dispatch(self, command: CommandEnvelope) -> CommandResult | ErrorEnvelope:
         connection = self.database.connection

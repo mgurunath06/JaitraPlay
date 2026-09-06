@@ -44,6 +44,25 @@ $env:JAITRA_UI_DEV_URL = "http://127.0.0.1:5173"
 $env:JAITRA_CORE_URL = "http://127.0.0.1:8765"
 Remove-Item Env:ELECTRON_RUN_AS_NODE -ErrorAction SilentlyContinue
 
+$coreDeadline = (Get-Date).AddSeconds(45)
+$health = $null
+Write-Host "Waiting for the JAITRA core service..."
+while ((Get-Date) -lt $coreDeadline) {
+    try {
+        $health = Invoke-RestMethod -Uri "$env:JAITRA_CORE_URL/api/v1/health" -TimeoutSec 2
+        if ($health.ready) {
+            break
+        }
+        Start-Sleep -Milliseconds 300
+    }
+    catch {
+        Start-Sleep -Milliseconds 300
+    }
+}
+if (-not $health -or -not $health.ready) {
+    throw "JAITRA core did not become ready at $env:JAITRA_CORE_URL within 45 seconds. Start the 'JAITRA: Core' task and try again."
+}
+
 Write-Host "Starting Windows-native JAITRA Play thick client..."
 Set-Location $repositoryRoot
 $electronProcess = Start-Process -FilePath $electronExe -ArgumentList $repositoryRoot -PassThru -Wait

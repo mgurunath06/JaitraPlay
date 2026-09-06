@@ -69,3 +69,13 @@ def test_background_story_job_tracks_fifteen_images(
         anyio.run(exercise)
     finally:
         service.stop()
+
+    restarted = StorybookService(repository_root, tmp_path)
+    books = restarted.list_books()
+    assert [(book.title, book.topic) for book in books] == [
+        ("Mimo’s Garden Day", "Mimo plants a garden")
+    ]
+    saved = restarted.get(books[0].story_id)
+    assert saved.status == "ready"
+    assert saved.completed_pages == 15
+    assert restarted.image_path(saved.story_id, 1).is_file()

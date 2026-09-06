@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any, Literal
 from uuid import uuid4
 
-from jaitra_core.api.models import StorybookPage, StorybookSnapshot
+from jaitra_core.api.models import StorybookLibraryItem, StorybookPage, StorybookSnapshot
 
 logger = logging.getLogger(__name__)
 TextProvider = Literal["mwapi", "startupapi", "openrouter"]
@@ -85,6 +85,7 @@ class StorybookService:
         )
         self._jobs: dict[str, _StoryJob] = {}
         self._tasks: set[asyncio.Task[None]] = set()
+        self._load_saved()
 
     def start(self, requested_topic: str | None) -> StorybookSnapshot:
         topic = self._safe_topic(requested_topic)
@@ -97,6 +98,7 @@ class StorybookService:
         )
         job = _StoryJob(snapshot=snapshot)
         self._jobs[story_id] = job
+        self._save_snapshot(snapshot)
         task = asyncio.create_task(self._run(job))
         self._tasks.add(task)
         task.add_done_callback(self._tasks.discard)
@@ -107,6 +109,20 @@ class StorybookService:
         if job is None:
             raise StorybookNotFound(story_id)
         return job.snapshot.model_copy(deep=True)
+
+    def list_books(self) -> list[StorybookLibraryItem]:
+        books = [
+            StorybookLibraryItem(
+                storyId=job.snapshot.story_id,
+                title=job.snapshot.title,
+                topic=job.snapshot.topic,
+                createdAt=job.snapshot.created_at,
+                completedPages=job.snapshot.completed_pages,
+            )
+            for job in self._jobs.values()
+            if job.snapshot.status == "ready" and job.snapshot.title is not None
+        ]
+        return sorted(books, key=lambda book: (book.title.casefold(), book.created_at))
 
     def image_path(self, story_id: str, page_number: int) -> Path:
         job = self._jobs.get(story_id)
@@ -383,3 +399,27 @@ class StorybookService:
         final = directory / "story.json"
         temporary.write_text(snapshot.model_dump_json(by_alias=True, indent=2), encoding="utf-8")
         temporary.replace(final)
+
+    def _load_saved(self) -> None:
+        if not self.storage_root.is_dir():
+            return
+        for path in self.storage_root.glob("*/story.json"):
+            try:
+                data = json.loads(path.read_text(encoding="utf-8"))
+                data.setdefault("createdAt", path.stat().st_mtime)
+                snapshot = StorybookSnapshot.model_validate(data)
+                if (
+                    snapshot.status != "ready"
+                    or snapshot.completed_pages != 15
+                    or len(snapshot.pages) != 15
+                    or not all(page.image_ready for page in snapshot.pages)
+                ):
+                    continue
+                if not all(
+                    (path.parent / f"page-{page.page_number:02d}.png").is_file()
+                    for page in snapshot.pages
+                ):
+                    continue
+                self._jobs[snapshot.story_id] = _StoryJob(snapshot=snapshot)
+            except (OSError, ValueError, TypeError, json.JSONDecodeError):
+                logger.warning("STORYBOOK_LIBRARY_ENTRY_INVALID path=%s", path)

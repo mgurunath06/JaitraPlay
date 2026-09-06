@@ -1,4 +1,4 @@
-import type { GeneratedQuestion, QuestionRequest, StateSnapshot, StorybookSnapshot } from "../../../../packages/contracts/src";
+import type { GeneratedQuestion, QuestionRequest, StateSnapshot, StorybookLibraryItem, StorybookSnapshot } from "../../../../packages/contracts/src";
 
 type CommandType = "BEGIN_INTERACTION" | "WELCOME_COMPLETE";
 
@@ -64,6 +64,14 @@ async function createStorybook(topic: string | null): Promise<StorybookSnapshot>
   return response.json() as Promise<StorybookSnapshot>;
 }
 
+async function listStorybooks(): Promise<StorybookLibraryItem[]> {
+  if (window.jaitra) return window.jaitra.listStorybooks();
+  if (!import.meta.env.DEV) throw new Error("Electron bridge is unavailable");
+  const response = await fetch("/api/v1/storybooks", { cache: "no-store" });
+  if (!response.ok) throw new Error(`Story library failed: ${response.status}`);
+  return response.json() as Promise<StorybookLibraryItem[]>;
+}
+
 async function getStorybook(storyId: string): Promise<StorybookSnapshot> {
   if (window.jaitra) return window.jaitra.getStorybook(storyId);
   if (!import.meta.env.DEV) throw new Error("Electron bridge is unavailable");
@@ -78,4 +86,4 @@ async function getStorybookImage(storyId: string, pageNumber: number): Promise<s
   return `/api/v1/storybooks/${encodeURIComponent(storyId)}/pages/${pageNumber}/image`;
 }
 
-export const coreClient = { getSnapshot, sendCommand, getQuestion, transcribe, createStorybook, getStorybook, getStorybookImage };
+export const coreClient = { getSnapshot, sendCommand, getQuestion, transcribe, createStorybook, listStorybooks, getStorybook, getStorybookImage };

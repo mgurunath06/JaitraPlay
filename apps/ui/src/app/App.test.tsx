@@ -39,6 +39,7 @@ describe("child shell", () => {
       getSnapshot: vi.fn().mockResolvedValue(idleSnapshot),
       sendCommand: vi.fn().mockResolvedValue({ status: "OK" }),
       createStorybook: vi.fn(),
+      listStorybooks: vi.fn().mockResolvedValue([]),
       getStorybook: vi.fn(),
       getStorybookImage: vi.fn(),
       getQuestion: vi.fn().mockResolvedValue({
@@ -66,6 +67,7 @@ describe("child shell", () => {
 
   it("renders the authoritative idle snapshot", async () => {
     render(<App />);
+    expect(screen.getByRole("img", { name: "Jaitra Labs" })).toBeVisible();
     expect(screen.getByRole("status")).toHaveTextContent("waking up");
     await act(async () => Promise.resolve());
     expect(screen.getByRole("heading", { name: "Ready to play?" })).toBeVisible();

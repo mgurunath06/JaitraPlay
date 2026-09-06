@@ -100,6 +100,7 @@ function installIpcHandlers(): void {
       body: JSON.stringify({ topic }),
     }, 10000);
   });
+  ipcMain.handle("jaitra:list-storybooks", () => coreRequest("/api/v1/storybooks", undefined, 10000));
   ipcMain.handle("jaitra:get-storybook", (_event, storyId: unknown) => {
     if (!validStoryId(storyId)) throw new Error("Invalid story id");
     return coreRequest(`/api/v1/storybooks/${storyId}`, undefined, 10000);

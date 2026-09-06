@@ -11,14 +11,14 @@ interface Activity extends PlayableActivity {
   availability: "AVAILABLE" | "COMING_SOON";
 }
 
-export function Hub({ activities, voiceAvailable = false, onPlayingChange, homeRequest }: { activities: Activity[]; voiceAvailable?: boolean; onPlayingChange: (playing: boolean) => void; homeRequest: number }) {
+export function Hub({ activities, voiceAvailable = false, onPlayingChange, onStoryReadingChange, homeRequest }: { activities: Activity[]; voiceAvailable?: boolean; onPlayingChange: (playing: boolean) => void; onStoryReadingChange?: (reading: boolean) => void; homeRequest: number }) {
   const [selected, setSelected] = useState<Activity | null>(null);
 
   useEffect(() => { onPlayingChange(Boolean(selected)); return () => onPlayingChange(false); }, [selected, onPlayingChange]);
   useEffect(() => { setSelected(null); quietMimo(); }, [homeRequest]);
   if (selected) {
     if (selected.activityId === "storybook") {
-      return <StorybookApp voiceAvailable={voiceAvailable} onBack={() => { quietMimo(); setSelected(null); }} />;
+      return <StorybookApp voiceAvailable={voiceAvailable} onReadingChange={onStoryReadingChange} onBack={() => { quietMimo(); setSelected(null); }} />;
     }
     return <PlayApp voiceAvailable={voiceAvailable} activity={selected} onBack={() => { quietMimo(); setSelected(null); }} />;
   }

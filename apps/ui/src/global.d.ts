@@ -1,4 +1,4 @@
-import type { GeneratedQuestion, QuestionRequest, StateSnapshot, StorybookSnapshot } from "../../../packages/contracts/src";
+import type { GeneratedQuestion, QuestionRequest, StateSnapshot, StorybookLibraryItem, StorybookSnapshot } from "../../../packages/contracts/src";
 
 declare global {
   interface Window {
@@ -9,6 +9,7 @@ declare global {
       sendCommand(type: "BEGIN_INTERACTION" | "WELCOME_COMPLETE"): Promise<unknown>;
       getQuestion(activityId: string, request: QuestionRequest): Promise<GeneratedQuestion>;
       createStorybook(topic: string | null): Promise<StorybookSnapshot>;
+      listStorybooks(): Promise<StorybookLibraryItem[]>;
       getStorybook(storyId: string): Promise<StorybookSnapshot>;
       getStorybookImage(storyId: string, pageNumber: number): Promise<string>;
     };

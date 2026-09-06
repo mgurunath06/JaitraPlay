@@ -1,21 +1,26 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { StorybookSnapshot } from "../../../../packages/contracts/src";
+import type { StorybookLibraryItem, StorybookSnapshot } from "../../../../packages/contracts/src";
 import { coreClient } from "../app/coreClient";
 import { quietMimo, reactMimo } from "../components/mimo";
 import { recordVoice, type Recording } from "../voice/record";
 
 type View = "menu" | "listening" | "processing" | "confirm" | "generating" | "reading" | "error";
+type TurnDirection = "next" | "previous";
 
-export function StorybookApp({ onBack, voiceAvailable }: { onBack: () => void; voiceAvailable: boolean }) {
+export function StorybookApp({ onBack, voiceAvailable, onReadingChange }: { onBack: () => void; voiceAvailable: boolean; onReadingChange?: (reading: boolean) => void }) {
   const [view, setView] = useState<View>("menu");
   const [topic, setTopic] = useState("");
   const [story, setStory] = useState<StorybookSnapshot | null>(null);
   const [pageIndex, setPageIndex] = useState(0);
   const [imageUrl, setImageUrl] = useState("");
   const [message, setMessage] = useState("");
+  const [library, setLibrary] = useState<StorybookLibraryItem[]>([]);
+  const [libraryLoading, setLibraryLoading] = useState(true);
+  const [turnDirection, setTurnDirection] = useState<TurnDirection | null>(null);
   const capture = useRef<Recording | null>(null);
   const controller = useRef<AbortController | null>(null);
   const timer = useRef<number | undefined>(undefined);
+  const turnTimer = useRef<number | undefined>(undefined);
   const imageCache = useRef(new Map<number, string>());
 
   const cancelRecording = useCallback(() => {
@@ -32,6 +37,21 @@ export function StorybookApp({ onBack, voiceAvailable }: { onBack: () => void; v
     document.addEventListener("visibilitychange", hidden);
     return () => { cancelRecording(); window.removeEventListener("jaitra:pause-voice", pause); document.removeEventListener("visibilitychange", hidden); };
   }, [cancelRecording]);
+
+  const refreshLibrary = useCallback(async () => {
+    try { setLibrary(await coreClient.listStorybooks()); }
+    catch { setLibrary([]); }
+    finally { setLibraryLoading(false); }
+  }, []);
+
+  useEffect(() => { void refreshLibrary(); }, [refreshLibrary]);
+
+  useEffect(() => {
+    onReadingChange?.(view === "reading");
+    return () => onReadingChange?.(false);
+  }, [onReadingChange, view]);
+
+  useEffect(() => () => window.clearTimeout(turnTimer.current), []);
 
   const stopListening = useCallback(async () => {
     const recording = capture.current;
@@ -101,7 +121,7 @@ export function StorybookApp({ onBack, voiceAvailable }: { onBack: () => void; v
         const next = await coreClient.getStorybook(story.storyId);
         if (!active) return;
         setStory(next);
-        if (next.status === "ready") { setPageIndex(0); setView("reading"); }
+        if (next.status === "ready") { setPageIndex(0); setView("reading"); void refreshLibrary(); }
         if (next.status === "failed") { setMessage(next.error ?? "The story could not be finished."); setView("error"); }
       } catch {
         if (active) { setMessage("The story helpers stopped responding. Please try again."); setView("error"); }
@@ -110,7 +130,7 @@ export function StorybookApp({ onBack, voiceAvailable }: { onBack: () => void; v
     void refresh();
     const poll = window.setInterval(() => void refresh(), 2000);
     return () => { active = false; window.clearInterval(poll); };
-  }, [story?.storyId, view]);
+  }, [refreshLibrary, story?.storyId, view]);
 
   useEffect(() => {
     if (view !== "reading" || !story) return;
@@ -128,9 +148,25 @@ export function StorybookApp({ onBack, voiceAvailable }: { onBack: () => void; v
     return () => { active = false; };
   }, [pageIndex, story, view]);
 
-  const reset = () => { setStory(null); setTopic(""); setMessage(""); setView("menu"); };
+  const reset = () => { setStory(null); setTopic(""); setMessage(""); setTurnDirection(null); setView("menu"); };
+  const openBook = async (item: StorybookLibraryItem) => {
+    cancelRecording(); imageCache.current.clear(); setImageUrl(""); setMessage("");
+    try {
+      const saved = await coreClient.getStorybook(item.storyId);
+      setStory(saved); setPageIndex(0); setView("reading");
+    } catch {
+      setMessage("That saved story could not be opened. Please try again."); setView("error");
+    }
+  };
   const exit = () => { cancelRecording(); quietMimo(); onBack(); };
   const currentPage = story?.pages[pageIndex];
+  const turnToPage = (nextIndex: number, direction: TurnDirection) => {
+    window.clearTimeout(turnTimer.current);
+    setMessage("");
+    setPageIndex(nextIndex);
+    setTurnDirection(direction);
+    turnTimer.current = window.setTimeout(() => setTurnDirection(null), 650);
+  };
 
   return (
     <section className="panel storybook-panel" aria-labelledby="storybook-title">
@@ -144,7 +180,13 @@ export function StorybookApp({ onBack, voiceAvailable }: { onBack: () => void; v
 
       {view === "menu" && <div className="storybook-menu">
         <p className="eyebrow">What shall we read today?</p>
-        <h1>Make a new story</h1>
+        <h1>Choose a storybook</h1>
+        {libraryLoading ? <p role="status">Opening your storybook shelf…</p> : library.length > 0 ? <div className="storybook-library">
+          {library.map(item => <button key={item.storyId} className="storybook-library-card" type="button" onClick={() => void openBook(item)}>
+            <span aria-hidden="true">📖</span><strong>{item.title}</strong><small>{item.topic}</small>
+          </button>)}
+        </div> : <p className="storybook-note">Your finished storybooks will appear here.</p>}
+        <h2>Make a new story</h2>
         <div className="storybook-actions">
           <button className="primary" type="button" onClick={() => { reactMimo("start"); void createStory(null); }}>🍀 I’m Feeling Lucky</button>
           <button className="primary story-topic-button" type="button" disabled={!voiceAvailable} onClick={() => void startListening()}>🎤 Choose a Topic</button>
@@ -182,13 +224,23 @@ export function StorybookApp({ onBack, voiceAvailable }: { onBack: () => void; v
 
       {view === "reading" && story && currentPage && <div className="storybook-reader">
         <div className="storybook-page-heading"><strong>{story.title}</strong><span>Page {currentPage.pageNumber} of {story.totalPages}</span></div>
-        <div className="storybook-image-frame">{imageUrl ? <img src={imageUrl} alt="" /> : <span role="status">Opening the picture…</span>}</div>
-        <p className="storybook-text">{currentPage.text}</p>
+        <div className="storybook-book-shell">
+          <article key={`${story.storyId}-${currentPage.pageNumber}`} className={`storybook-book ${turnDirection ? `turn-${turnDirection}` : ""}`} aria-label={`${story.title}, page ${currentPage.pageNumber}`}>
+            <div className="storybook-paper storybook-paper-left">
+              <span className="storybook-page-number" aria-hidden="true">{currentPage.pageNumber}</span>
+              <p className="storybook-text">{currentPage.text}</p>
+            </div>
+            <div className="storybook-paper storybook-paper-right">
+              <div className="storybook-image-frame">{imageUrl ? <img src={imageUrl} alt="" /> : <span role="status">Opening the picture…</span>}</div>
+              <span className="storybook-page-number storybook-page-number-right" aria-hidden="true">{currentPage.pageNumber}</span>
+            </div>
+          </article>
+        </div>
         {message && <p role="alert" className="storybook-note">{message}</p>}
         <div className="storybook-reader-actions">
-          <button className="secondary-button" type="button" disabled={pageIndex === 0} onClick={() => { setMessage(""); setPageIndex((page) => page - 1); }}>← Previous</button>
+          <button className="secondary-button" type="button" disabled={pageIndex === 0 || turnDirection !== null} onClick={() => turnToPage(pageIndex - 1, "previous")}>← Previous</button>
           {pageIndex < story.pages.length - 1
-            ? <button className="primary compact" type="button" onClick={() => { setMessage(""); setPageIndex((page) => page + 1); }}>Next page →</button>
+            ? <button className="primary compact" type="button" disabled={turnDirection !== null} onClick={() => turnToPage(pageIndex + 1, "next")}>Next page →</button>
             : <button className="primary compact" type="button" onClick={reset}>Make another story</button>}
         </div>
       </div>}

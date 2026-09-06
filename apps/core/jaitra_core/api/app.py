@@ -79,6 +79,13 @@ def create_app(runtime: CoreRuntime, *, manage_lifecycle: bool = True) -> FastAP
             story.model_dump(mode="json", by_alias=True), status_code=202
         )
 
+    @app.get("/api/v1/storybooks")
+    async def storybook_library() -> list[dict[str, object]]:
+        return [
+            book.model_dump(mode="json", by_alias=True)
+            for book in runtime.storybook_library()
+        ]
+
     @app.get("/api/v1/storybooks/{story_id}")
     async def storybook(story_id: str) -> JSONResponse:
         try:

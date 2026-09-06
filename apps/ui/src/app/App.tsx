@@ -8,15 +8,22 @@ import { SetupPanel } from "../setup/SetupPanel";
 import { CameraPanel } from "../camera/CameraPanel";
 import { readSettings } from "../setup/settings";
 import { coreClient } from "./coreClient";
+import jaitraLabsLogo from "../../../../docs/jl logo.jpg";
 
 const RETRY_MILLISECONDS = 2000;
+const SPLASH_MILLISECONDS = 1600;
 
 export function App() {
+  const [splashVisible, setSplashVisible] = useState(true);
   const [playing, setPlaying] = useState(false);
   const [homeRequest, setHomeRequest] = useState(0);
   const [confirmExit, setConfirmExit] = useState(false);
   const [setupOpen, setSetupOpen] = useState(false);
   const [cameraView, setCameraView] = useState(false);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setSplashVisible(false), SPLASH_MILLISECONDS);
+    return () => window.clearTimeout(timer);
+  }, []);
   useEffect(() => {
     if (setupOpen || confirmExit) {
       window.dispatchEvent(new Event("jaitra:pause-voice"));
@@ -69,12 +76,16 @@ export function App() {
         <button className="back-button" onClick={() => void quit()}>Exit now</button>
       </section>
     </div>}
+    {splashVisible && <div className="brand-splash">
+      <img src={jaitraLabsLogo} alt="Jaitra Labs" />
+    </div>}
   </>;
 }
 
 function ChildApp({ onPlayingChange, homeRequest }: { onPlayingChange: (playing: boolean) => void; homeRequest: number }) {
   const [snapshot, setSnapshot] = useState<StateSnapshot | null>(null);
   const [recovering, setRecovering] = useState(false);
+  const [storyReading, setStoryReading] = useState(false);
 
   const refresh = useCallback(async () => {
     try {
@@ -107,8 +118,8 @@ function ChildApp({ onPlayingChange, homeRequest }: { onPlayingChange: (playing:
 
   const { appState, childDisplayName, companionName, activities } = snapshot.payload;
   return (
-    <main className={`stage ${appState === "HUB" ? "stage-hub" : ""}`}>
-      <Companion name={companionName} />
+    <main className={`stage ${appState === "HUB" ? "stage-hub" : ""} ${storyReading ? "stage-storybook-reading" : ""}`}>
+      {!storyReading && <Companion name={companionName} />}
       {appState === "IDLE" && (
         <section className="panel" aria-labelledby="welcome-title">
           <p className="eyebrow">Hello, {childDisplayName}!</p>
@@ -127,7 +138,7 @@ function ChildApp({ onPlayingChange, homeRequest }: { onPlayingChange: (playing:
           </button>
         </section>
       )}
-      {appState === "HUB" && <Hub onPlayingChange={onPlayingChange} homeRequest={homeRequest} activities={activities} voiceAvailable={snapshot.payload.capabilities.voice === "AVAILABLE"} />}
+      {appState === "HUB" && <Hub onPlayingChange={onPlayingChange} onStoryReadingChange={setStoryReading} homeRequest={homeRequest} activities={activities} voiceAvailable={snapshot.payload.capabilities.voice === "AVAILABLE"} />}
     </main>
   );
 }

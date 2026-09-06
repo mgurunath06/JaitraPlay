@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from typing import Any, Literal
 from uuid import UUID
 
@@ -78,6 +79,15 @@ class StorybookSnapshot(StrictModel):
     text_provider: str | None = Field(default=None, alias="textProvider", max_length=40)
     image_provider: str = Field(default="OpenRouter", alias="imageProvider", max_length=80)
     error: str | None = Field(default=None, max_length=120)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC), alias="createdAt")
+
+
+class StorybookLibraryItem(StrictModel):
+    story_id: str = Field(alias="storyId", pattern=r"^[0-9a-f-]{36}$")
+    title: str = Field(min_length=3, max_length=80)
+    topic: str = Field(min_length=3, max_length=120)
+    created_at: datetime = Field(alias="createdAt")
+    completed_pages: int = Field(alias="completedPages", ge=0, le=15)
 
 
 class CapabilitySnapshot(StrictModel):

@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { StorybookSnapshot } from "../../../../packages/contracts/src";
 import { coreClient } from "../app/coreClient";
 import { recordVoice } from "../voice/record";
@@ -19,9 +19,11 @@ const planningStory: StorybookSnapshot = {
   textProvider: null,
   imageProvider: "OpenRouter · bytedance-seed/seedream-5-0-lite",
   error: null,
+  createdAt: "2026-09-06T00:00:00Z",
 };
 
 afterEach(() => { vi.restoreAllMocks(); vi.useRealTimers(); });
+beforeEach(() => { vi.spyOn(coreClient, "listStorybooks").mockResolvedValue([]); });
 
 describe("storybook", () => {
   it("starts a lucky story without recording", async () => {
@@ -59,5 +61,40 @@ describe("storybook", () => {
     render(<StorybookApp onBack={vi.fn()} voiceAvailable={false} />);
     expect(screen.getByRole("button", { name: /Choose a Topic/ })).toBeDisabled();
     expect(screen.getByText(/enable the microphone in Setup/)).toBeVisible();
+  });
+
+  it("lists saved books by title and opens one without generation", async () => {
+    const onReadingChange = vi.fn();
+    const saved: StorybookSnapshot = {
+      ...planningStory,
+      status: "ready",
+      title: "Mimo’s Garden Day",
+      completedPages: 15,
+      pages: [
+        { pageNumber: 1, text: "Mimo waters a bright garden.", imageReady: true },
+        { pageNumber: 2, text: "A tiny green leaf waves hello.", imageReady: true },
+      ],
+    };
+    vi.mocked(coreClient.listStorybooks).mockResolvedValue([{
+      storyId: saved.storyId, title: saved.title!, topic: saved.topic,
+      createdAt: saved.createdAt, completedPages: 15,
+    }]);
+    vi.spyOn(coreClient, "getStorybook").mockResolvedValue(saved);
+    vi.spyOn(coreClient, "getStorybookImage").mockResolvedValue("saved-page.png");
+    vi.spyOn(coreClient, "createStorybook").mockResolvedValue(planningStory);
+    render(<StorybookApp onBack={vi.fn()} onReadingChange={onReadingChange} voiceAvailable />);
+    await act(async () => Promise.resolve());
+
+    fireEvent.click(screen.getByRole("button", { name: /Mimo’s Garden Day/ }));
+    await act(async () => Promise.resolve());
+
+    expect(coreClient.getStorybook).toHaveBeenCalledWith(saved.storyId);
+    expect(coreClient.createStorybook).not.toHaveBeenCalled();
+    expect(screen.getByText("Mimo waters a bright garden.")).toBeVisible();
+    expect(onReadingChange).toHaveBeenLastCalledWith(true);
+
+    fireEvent.click(screen.getByRole("button", { name: "Next page →" }));
+    expect(screen.getByRole("article", { name: /page 2/ })).toHaveClass("turn-next");
+    expect(screen.getByText("A tiny green leaf waves hello.")).toBeVisible();
   });
 });

@@ -72,4 +72,13 @@ export interface StorybookSnapshot {
   textProvider: string | null;
   imageProvider: string;
   error: string | null;
+  createdAt: string;
+}
+
+export interface StorybookLibraryItem {
+  storyId: string;
+  title: string;
+  topic: string;
+  createdAt: string;
+  completedPages: number;
 }
