@@ -388,7 +388,7 @@ check establishes startup and snapshot delivery, not microphone recognition qual
 `deploy/scripts/check-provider-health.sh` runs without the app, `uv`, or optional
 Python packages. It recursively inspects every `*.json` in `.claude` each run, so
 new profiles are picked up automatically. It sends a minimal text-generation
-request per provider, not just a TCP ping. These requests consume provider usage.
+request per JSON provider, plus an ElevenLabs audio-processing request, not just a TCP ping. These requests consume provider usage.
 It does not test image generation or send child data.
 
 ```bash
@@ -467,3 +467,32 @@ A live on-demand run reported OpenRouter healthy, MWAPI HTTP 429, and StartupAPI
 timed out at 30 seconds. These are point-in-time observations from the development
 machine, not permanent provider status or Ubuntu connectivity results. The Ubuntu
 timer must still be installed there; adding source files does not enable it.
+
+
+### ElevenLabs scheduled health check
+
+The same checker now reads `.local/secrets/elevenlabs.env` on every run. The file
+contains `ELEVENLABS_API_KEY=...`; optional matching quotes and `export ` are
+accepted. It is parsed as data, never executed. The secret stays outside Git and
+must be readable by the timer's runtime user (`admin2` on `/opt/jaitraplay`).
+`--elevenlabs-env PATH` overrides this location. Missing, unreadable, empty, or
+duplicate keys produce a failed result and make the combined report unhealthy.
+
+The probe posts one second of generated silent WAV audio to ElevenLabs
+`/v1/speech-to-text` with `scribe_v2`, using the documented `xi-api-key` header.
+It requires a successful JSON response containing a string `text` field. Empty
+text is valid for silence. `AUDIO_PROCESSING_OK` confirms authenticated audio
+processing; it does not certify transcription accuracy, microphone capture,
+audio isolation, voice training, or other ElevenLabs capabilities.
+API reference: https://elevenlabs.io/docs/api-reference/speech-to-text/convert
+
+This consumes speech-to-text usage under the account's API billing rules. No child
+recording is used. The existing 30-second timeout (configurable up to 120), blocked
+redirects, response-size limit, redacted errors, file lock, atomic report, journal
+output, and exit-code rules apply. Credentials and response bodies are never
+included in the report. Other provider checks continue if ElevenLabs fails.
+
+The existing timer remains at minute 00 and 30; no extra timer is necessary.
+Updating the checkout updates the checker used on the next scheduled run, without
+restarting the application or changing its local voice recognizer. This integration
+is for monitoring only; the interactive app still does not use ElevenLabs.
