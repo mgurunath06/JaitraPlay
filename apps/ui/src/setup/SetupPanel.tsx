@@ -44,7 +44,7 @@ export function SetupPanel({ onClose }: { onClose: () => void }) {
   return <div className="setup-overlay">
     <section className="setup-panel" role="dialog" aria-modal="true" aria-labelledby="setup-title" onKeyDown={trapFocus}>
       <header className="setup-header"><div><p className="eyebrow">Quick device check</p><h1 id="setup-title">Voice & camera setup</h1></div><button autoFocus className="back-button" onClick={onClose}>Done</button></header>
-      <p>Choose each device and test it once. Nothing is recorded or saved.</p>
+      <p>Choose each device and test it once. Audio is captured briefly for local recognition and is not saved. Saved corrections teach word matching, not a new voice model.</p>
       <div className="setup-columns">
         <section aria-labelledby="voice-setup-title">
           <h2 id="voice-setup-title">1. Test the microphone</h2>

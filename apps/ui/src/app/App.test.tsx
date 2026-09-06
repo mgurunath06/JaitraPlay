@@ -34,6 +34,7 @@ describe("child shell", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     window.jaitra = {
+      identity: vi.fn().mockResolvedValue(null),
       transcribe: vi.fn().mockResolvedValue({ text: "elephant" }),
       quit: vi.fn().mockResolvedValue(undefined),
       getSnapshot: vi.fn().mockResolvedValue(idleSnapshot),
@@ -68,7 +69,7 @@ describe("child shell", () => {
   it("renders the authoritative idle snapshot", async () => {
     render(<App />);
     expect(screen.getByRole("img", { name: "Jaitra Labs" })).toBeVisible();
-    expect(screen.getByRole("status")).toHaveTextContent("waking up");
+    expect(screen.getByText("Mimo is waking up…")).toBeVisible();
     await act(async () => Promise.resolve());
     expect(screen.getByRole("heading", { name: "Ready to play?" })).toBeVisible();
     expect(screen.getByLabelText("Mimo, your play companion")).toBeVisible();

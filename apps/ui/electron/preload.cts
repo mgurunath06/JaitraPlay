@@ -8,6 +8,7 @@ interface QuestionRequest {
 }
 
 contextBridge.exposeInMainWorld("jaitra", {
+  identity: (action: "get" | "save" | "delete", profile?: unknown) => ipcRenderer.invoke("jaitra:identity", action, profile),
   transcribe: (request: { audio: string; sampleRate: number; phrases?: string[] }) => ipcRenderer.invoke("jaitra:transcribe", request),
   quit: () => ipcRenderer.invoke("jaitra:quit"),
   getSnapshot: () => ipcRenderer.invoke("jaitra:get-snapshot"),

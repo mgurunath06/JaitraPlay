@@ -8,7 +8,7 @@ self.onmessage = async ({ data }) => {
       const files = await Vision.FilesetResolver.forVisionTasks(new URL("./vendor/wasm", self.location.href).href);
       const create = delegate => Vision.PoseLandmarker.createFromOptions(files, {
         baseOptions: { modelAssetPath: new URL("./vendor/pose_landmarker_lite.task", self.location.href).href, delegate },
-        runningMode: "VIDEO", numPoses: 1, minPoseDetectionConfidence: 0.4,
+        runningMode: "VIDEO", numPoses: 4, minPoseDetectionConfidence: 0.4,
         minPosePresenceConfidence: 0.4, minTrackingConfidence: 0.4,
       });
       if (data.preferGpu) {

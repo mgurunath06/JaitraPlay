@@ -167,6 +167,68 @@ mode also needs microphone permission. WSL microphone forwarding depends on the 
 recognition quality, especially for young children, accents, and room noise, needs testing on
 the actual appliance. Missing/denied microphones show a retry message instead of blocking play.
 
+Capture uses the device's default audio rate (16, 44.1 or 48 kHz), with browser echo
+cancellation, noise suppression and automatic gain control requested. No additional
+cleanup API is required. The microphone tracks and audio context are closed after
+capture. A “sent silence” message means check mute/input volume; “sent no audio”
+means the capture pipeline delivered no samples. A recognition failure means check
+the core/model, whereas an empty transcript means the recognizer found no words.
+Setup saves text aliases only; it cannot learn a voice from an empty transcript.
+
+An optional future ElevenLabs key can be kept in `.local/secrets/elevenlabs.env`
+as `ELEVENLABS_API_KEY=...` (ignored by Git; keep file permissions at `600`).
+The scheduled provider health checker loads this file for its ElevenLabs probe.
+The interactive app still uses local recognition and does not upload child audio.
+On a separate appliance this file must be created there; a local file is not deployed
+automatically. Never put the key in UI settings or a `VITE_` environment variable.
+
+## Remember Jaitra across sessions
+
+Open **Remember Jaitra** in the top bar. This first version supports one saved
+identity, Jaitra, with up to four visible people in the camera frame.
+
+1. Select **Start recognition**, then **Enroll Jaitra**.
+2. Ask Jaitra to lower his hand, then raise it and hold it up. If more than one
+   person raises a hand, lower the other hands and repeat.
+3. Check the highlighted person and select **This is Jaitra — capture his face views**.
+4. Capture the six prompted views: front, slightly left and slightly right. Wait
+   for a fresh frame between captures and keep his face visible. If tracking is
+   lost, select him again; incomplete views are discarded.
+5. Select **Save Jaitra for future sessions**. Closing the panel keeps recognition
+   running, with a visible camera status. **Pause recognition** releases the camera.
+
+The core saves only face descriptors, not photos/video, under the configured
+state directory at `identity/jaitra.json` (default `.local/state/identity/jaitra.json`).
+The folder/file are created with owner-only permissions on Linux. The profile is
+loaded on later app starts, which resume recognition automatically. Use **Forget
+Jaitra** to delete it or **Enroll Jaitra again** to explicitly replace it. Backups of
+the state directory also contain the profile; deletion does not erase backups.
+
+Matching uses a pinned, local face model and several agreeing frames. Position
+tracking follows an already selected person while the face turns away. Ambiguous
+crossings, a conflicting face, missing frames or disappearance drop the selection.
+If uncertain, Mimo asks “Is it you, Jaitra?” and requests a fresh hand raise. That
+confirmation selects a session track only and never edits the saved profile.
+A continuously visible person is not greeted repeatedly; return greetings have
+at least a 60-second cooldown. Prompts also appear as text if local speech is unavailable.
+
+Recognition pauses when the app is hidden, Setup/Camera view/Exit is open, or the
+camera stops. It resumes after those panels close. Game-time recognition is silent
+to avoid interrupting game audio. This is not background monitoring while the app
+is closed. Detection thresholds and recognition accuracy still need a physical
+trial with Jaitra, including crossings, return visits and side/back views. A full
+back view is not a persistent biometric identifier; it may require the gesture.
+
+The `jaitra:participant` UI event supplies only the selected name, session track,
+selection source, current body points and timestamp (or null when lost). This is
+the integration point for future movement games; jumps, claps and their scoring
+are not implemented by this recognition feature. Other family profiles are not yet supported.
+
+Install updated npm dependencies and run `npm run build` on the appliance; the
+camera setup step copies local face models from the pinned npm package. Restart
+the core and UI so the new identity API and screen are both active. No ElevenLabs
+key or cloud recognition service is used for this feature.
+
 ## Setup: voice practice, camera position and gestures
 
 Use **Setup** in the top bar, including from the recovery screen. It provides:

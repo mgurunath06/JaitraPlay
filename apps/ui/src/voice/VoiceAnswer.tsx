@@ -3,7 +3,7 @@ import type { GeneratedQuestion } from "../../../../packages/contracts/src";
 import { readSettings } from "../setup/settings";
 import { coreClient } from "../app/coreClient";
 import { matchAnswer, recognitionPhrases } from "./match";
-import { recordVoice, type Recording } from "./record";
+import { CaptureError, recordVoice, type Recording } from "./record";
 
 export function VoiceAnswer({ choices, onAnswer, onTranscript, useCorrections = true, constrainRecognition = true }: { choices: GeneratedQuestion["choices"]; onAnswer: (value: string) => void; onTranscript?: (text: string) => void; useCorrections?: boolean; constrainRecognition?: boolean }) {
   const [state, setState] = useState<"idle" | "starting" | "listening" | "processing">("idle");
@@ -40,8 +40,8 @@ export function VoiceAnswer({ choices, onAnswer, onTranscript, useCorrections = 
       onTranscript?.(result.text);
       setMessage(result.text ? `I heard “${result.text}”.${matched ? " Got it!" : " Try one answer shown on the screen."}` : "I didn’t hear an answer. Move closer and try once more.");
       if (matched) onAnswer(matched);
-    } catch {
-      if (!current.signal.aborted) setMessage("I couldn’t hear you this time. Try again or use the buttons.");
+    } catch (error) {
+      if (!current.signal.aborted) setMessage(error instanceof CaptureError ? error.message : "Voice recognition failed. Check that the app core and speech model are running, then try again.");
     } finally { if (!current.signal.aborted) setState("idle"); }
   };
 
@@ -57,8 +57,11 @@ export function VoiceAnswer({ choices, onAnswer, onTranscript, useCorrections = 
       capture.current = recording;
       setState("listening");
       timer.current = window.setTimeout(() => void stop(), 4000);
-    } catch {
-      if (!current.signal.aborted) { setState("idle"); setMessage("Microphone unavailable. Allow microphone access or use the buttons."); }
+    } catch (error) {
+      if (!current.signal.aborted) {
+        setState("idle");
+        setMessage(error instanceof CaptureError ? error.message : error instanceof DOMException && error.name === "NotReadableError" ? "Microphone unavailable. Another app may be using it, or the audio device could not start." : "Microphone unavailable. Allow microphone access and check the selected input in Setup.");
+      }
     }
   };
   return <div className="voice-answer">

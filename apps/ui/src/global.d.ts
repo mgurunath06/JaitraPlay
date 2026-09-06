@@ -1,8 +1,10 @@
+import type { IdentityProfile } from "./identity/types";
 import type { GeneratedQuestion, QuestionRequest, StateSnapshot, StorybookLibraryItem, StorybookSnapshot } from "../../../packages/contracts/src";
 
 declare global {
   interface Window {
     jaitra?: {
+      identity(action: "get" | "save" | "delete", profile?: IdentityProfile): Promise<IdentityProfile | null | { saved?: boolean; deleted?: boolean }>;
       quit(): Promise<void>;
       transcribe(request: { audio: string; sampleRate: number; phrases?: string[] }): Promise<{ text: string }>;
       getSnapshot(): Promise<StateSnapshot>;

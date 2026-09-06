@@ -147,7 +147,8 @@ MediaPipe Pose Landmarker Lite runs in a worker with one frame in flight and a
 200 ms pause between frames. It reports presence, mirrored screen position,
 raised hands, waves, and approximate zones from visible ankles. Multiple people,
 hidden feet and overlapping zones produce uncertainty. It does not recognize a
-child's identity, reconstruct metric 3D position, or submit game answers.
+child's identity, reconstruct metric 3D position, or submit game answers. The separate
+Remember Jaitra feature adds persistent identity enrollment and session tracking below.
 
 Camera frames stay in the renderer/worker. CPU is default; optional browser GPU
 delegation falls back to CPU if initialization fails. Preprocessing still needs
@@ -331,7 +332,8 @@ claiming production acceptance.
   the validated `activities.enabled` intersection. Configured content gating
   therefore does not fully govern visible or callable games.
 - Rounds/scores are UI-local; durable rewards, sessions, full parent mode,
-  identity recognition and controlled video playback are not implemented.
+  family identity profiles and controlled video playback are not implemented.
+  Jaitra-only local enrollment and recognition are described in README.md.
 - WebSocket events are an initial snapshot only. API contracts are maintained
   manually in Python and TypeScript and must be updated together.
 - A quiz can try three 30-second providers while Electron allows 70 seconds for
@@ -496,3 +498,33 @@ The existing timer remains at minute 00 and 30; no extra timer is necessary.
 Updating the checkout updates the checker used on the next scheduled run, without
 restarting the application or changing its local voice recognizer. This integration
 is for monitoring only; the interactive app still does not use ElevenLabs.
+
+
+## Persistent Jaitra recognition
+
+The core exposes GET/PUT/DELETE `/api/v1/identity/jaitra` on its existing loopback
+boundary. PUT accepts version 1, model `face-api-1.7.15-recognition`, name `Jaitra`,
+and 6–12 finite 128-dimensional face descriptors. Invalid data is rejected before
+writing. Profiles are stored atomically in `<state_dir>/identity/jaitra.json` with
+owner-only Linux permissions; GET returns null when not enrolled. Corrupt profiles
+return an error rather than being silently discarded. DELETE is idempotent.
+
+The new Remember Jaitra panel performs parent-confirmed enrollment and automatically
+loads the profile on later starts. `@vladmandic/face-api` 1.7.15 supplies local face
+models, staged alongside the existing pose model by `setup-camera.mjs`. The pose
+worker now detects up to four people. Face and pose inference use the same captured
+frame; face descriptors are associated only with a unique visible pose nose inside
+the face box. CPU face inference is lazy-loaded and is not required for touch games.
+
+Three consecutive face matches, each agreeing with three enrollment samples at a
+mean Euclidean distance below 0.42, select the saved identity. These are initial
+conservative thresholds, not a validated accuracy claim. Tracking uses mutual,
+unambiguous nearby shoulder positions and drops ambiguous associations. A fresh,
+unique hand raise can recover the session selection without modifying enrollment.
+Only explicitly confirmed enrollment writes descriptors. Other people's descriptors
+exist transiently during detection and are not persisted. No raw video is saved or
+uploaded. See README.md for enrollment, lifecycle, storage, deletion and limitations.
+
+Movement-game consumers can listen to `jaitra:participant`, which carries the
+selected name, track ID, selection source, pose and time, or null on loss/pause.
+This change does not implement movement-game prompts/scoring or family enrollment.

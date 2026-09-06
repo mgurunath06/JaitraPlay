@@ -18,3 +18,11 @@ catch {
 }
 await copyFile(cache, join(target, "pose_landmarker_lite.task"));
 console.log("Local camera assets ready.");
+
+// Pinned npm package includes the recognition models; runtime remains offline.
+for (const model of ["tiny_face_detector_model", "face_landmark_68_model", "face_recognition_model"]) {
+  for (const suffix of [".bin", "-weights_manifest.json"]) {
+    await copyFile(join(root, "node_modules/@vladmandic/face-api/model", model + suffix), join(target, model + suffix));
+  }
+}
+await copyFile(join(root, "node_modules/@vladmandic/face-api/LICENSE"), join(target, "face-api-LICENSE.txt"));

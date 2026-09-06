@@ -14,6 +14,7 @@ from jaitra_core.api.models import (
     StorybookCreateRequest,
     TranscriptionRequest,
 )
+from jaitra_core.identity import IdentityProfile
 from jaitra_core.providers import QuestionGenerationError, StorybookNotFound
 from jaitra_core.runtime import CoreRuntime
 from jaitra_core.voice import VoiceUnavailable
@@ -30,6 +31,23 @@ def create_app(runtime: CoreRuntime, *, manage_lifecycle: bool = True) -> FastAP
             runtime.stop()
 
     app = FastAPI(title="JAITRA Core", version="1.0", lifespan=lifespan)
+
+    @app.get("/api/v1/identity/jaitra")
+    async def get_identity() -> IdentityProfile | None:
+        try:
+            return await asyncio.to_thread(runtime.identity.read)
+        except RuntimeError:
+            raise HTTPException(503, "IDENTITY_PROFILE_UNREADABLE") from None
+
+    @app.put("/api/v1/identity/jaitra")
+    async def save_identity(profile: IdentityProfile) -> dict[str, bool]:
+        await asyncio.to_thread(runtime.identity.save, profile)
+        return {"saved": True}
+
+    @app.delete("/api/v1/identity/jaitra")
+    async def delete_identity() -> dict[str, bool]:
+        await asyncio.to_thread(runtime.identity.delete)
+        return {"deleted": True}
 
     @app.post("/api/v1/voice/transcribe")
     async def transcribe(request: TranscriptionRequest) -> dict[str, str]:

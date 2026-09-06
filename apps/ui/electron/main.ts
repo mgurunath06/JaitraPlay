@@ -57,6 +57,16 @@ async function coreImageRequest(path: string): Promise<string> {
 }
 
 function installIpcHandlers(): void {
+  ipcMain.handle("jaitra:identity", (event, action: unknown, profile: unknown) => {
+    if (event.sender !== mainWindow?.webContents || event.senderFrame !== mainWindow.webContents.mainFrame) throw new Error("Unknown sender");
+    if (action !== "get" && action !== "save" && action !== "delete") throw new Error("Invalid identity operation");
+    const body = action === "save" ? JSON.stringify(profile) : undefined;
+    if (action === "save" && (!body || body.length > 50000)) throw new Error("Invalid identity profile");
+    return coreRequest("/api/v1/identity/jaitra", {
+      method: action === "get" ? "GET" : action === "save" ? "PUT" : "DELETE",
+      headers: { "Content-Type": "application/json" }, body,
+    });
+  });
   ipcMain.handle("jaitra:transcribe", (event, request: unknown) => {
     if (event.sender !== mainWindow?.webContents || event.senderFrame !== mainWindow.webContents.mainFrame) throw new Error("Unknown sender");
     if (!request || typeof request !== "object") throw new Error("Invalid audio");

@@ -235,3 +235,17 @@ body { overflow-y: auto; }
   .storybook-paper-right { min-height: min(68vw, 460px); }
   .storybook-page-heading { align-items: center; }
 }
+
+.identity-room { position: fixed; left: 16px; bottom: 12px; z-index: 35; background: #fff; color: #10253f; border: 2px solid #b3ccd9; border-radius: 16px; padding: 10px 14px; box-shadow: 0 4px 18px #10253f22; }
+.identity-open { width: min(580px, calc(100vw - 32px)); max-height: 85vh; overflow-y: auto; }
+.identity-room header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.identity-room button { margin: 6px; padding: 8px 12px; }
+.identity-status { font-size: 0.85rem; }
+.identity-preview { position: relative; margin-top: 10px; }
+.identity-preview video { width: 100%; display: block; transform: scaleX(-1); border-radius: 12px; }
+.identity-label { position: absolute; transform: translate(-50%, -50%); padding: 4px 8px; background: #10253fee; color: #fff; border-radius: 8px; font-size: 0.8rem; }
+.identity-label.selected { background: #08643c; outline: 3px solid #70f5ad; }
+.identity-room button { border: 1px solid #b3ccd9; border-radius: 10px; background: #edf5ff; color: #10253f; font: inherit; cursor: pointer; }
+.identity-room button:disabled { opacity: 0.5; cursor: default; }
+.identity-room button:focus-visible { outline: 3px solid #7056d7; outline-offset: 2px; }
+.identity-prompt { max-width: 320px; margin: 8px 0 0; font-size: 0.95rem; }

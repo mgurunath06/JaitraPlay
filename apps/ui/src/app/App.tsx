@@ -6,6 +6,7 @@ import { Hub } from "../states/Hub";
 import { Recovery } from "../states/Recovery";
 import { SetupPanel } from "../setup/SetupPanel";
 import { CameraPanel } from "../camera/CameraPanel";
+import { IdentityRoom } from "../identity/IdentityRoom";
 import { readSettings } from "../setup/settings";
 import { coreClient } from "./coreClient";
 import jaitraLabsLogo from "../../../../docs/jl logo.jpg";
@@ -20,6 +21,7 @@ export function App() {
   const [confirmExit, setConfirmExit] = useState(false);
   const [setupOpen, setSetupOpen] = useState(false);
   const [cameraView, setCameraView] = useState(false);
+  const [identityOpen, setIdentityOpen] = useState(false);
   useEffect(() => {
     const timer = window.setTimeout(() => setSplashVisible(false), SPLASH_MILLISECONDS);
     return () => window.clearTimeout(timer);
@@ -55,8 +57,10 @@ export function App() {
     {!playing && <nav className="app-controls" aria-label="App controls" inert={setupOpen || confirmExit || undefined}>
       <button onClick={() => { setCameraView(false); setSetupOpen(true); }}>Setup</button>
       <button onClick={() => setCameraView(value => !value)}>{cameraView ? "Hide camera view" : "Camera view"}</button>
+      <button onClick={() => { setIdentityOpen(v => !v); setCameraView(false); }}>Remember Jaitra</button>
       <button onClick={() => setConfirmExit(true)}>Exit app</button>
     </nav>}
+    <IdentityRoom open={identityOpen && !setupOpen && !confirmExit && !cameraView} paused={setupOpen || confirmExit || cameraView} quiet={playing} onClose={() => setIdentityOpen(false)} />
     {setupOpen && <SetupPanel onClose={() => setSetupOpen(false)} />}
     {cameraView && !playing && !setupOpen && !confirmExit && <aside className="play-camera"><CameraPanel settings={readSettings()} /></aside>}
     <div inert={confirmExit || setupOpen || undefined}><ChildApp onPlayingChange={setPlaying} homeRequest={homeRequest} /></div>

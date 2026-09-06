@@ -18,6 +18,7 @@
   "dependencies": {
     "@mediapipe/tasks-vision": "1.0.1",
     "@vitejs/plugin-react": "latest",
+    "@vladmandic/face-api": "1.7.15",
     "electron": "latest",
     "react": "latest",
     "react-dom": "latest",
