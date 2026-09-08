@@ -123,7 +123,33 @@ Core endpoint: `http://127.0.0.1:8765`; health and snapshot paths are
 For manual startup, exit Electron and stop core with Ctrl+C before restarting.
 Prefer the corrected existing launcher once its update is verified.
 
-## Existing scheduled provider checks
+## Launch logs and sharing failures
+
+The tracked `run.sh` now creates a private, timestamped `.local/logs/run-*`
+directory for each launch. `launcher.log` captures terminal output including build
+and Electron errors, commit, stage, and final exit status. `core.log` captures the
+core separately. `.local/logs/latest-run` points the collector to the most recent
+run; `.local/logs/core.log` is a compatibility symlink to that run's core log.
+Logs remain local and Git-ignored; no automatic upload or deletion is performed.
+
+After a failure, from `/opt/jaitraplay`, run as `admin2` (or remotely using sudo):
+
+```bash
+sudo -u admin2 -H python3 /opt/jaitraplay/deploy/scripts/collect-diagnostics.py
+```
+
+This prints the path of a `share-diagnostics-*.txt` file containing at most the
+last 128 KiB of each latest-run log. It excludes config, environment dumps,
+provider profiles, recordings, and identity files. Common credential patterns
+and URLs are redacted, but this is best effort: review the report before sharing.
+The report has mode 600. To read it remotely, use `sudo -u admin2 cat` with the
+exact printed path, then copy the text into chat; alternatively attach the file
+from the Ubuntu desktop. Give these actions one at a time to the owner.
+
+Logging changes and collector require pulling the update onto Ubuntu. Actual
+Ubuntu startup and log sharing remain pending owner verification.
+
+## Provider timer details
 
 Previously verified installed and enabled system units:
 

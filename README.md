@@ -96,6 +96,21 @@ npm run electron:dev
 
 ## Verification
 
+The Ubuntu `./run.sh` launcher saves each run under `.local/logs/run-*`, including
+build/Electron output in `launcher.log` and backend output in `core.log`. The
+launcher prints the log directory and exit status. After a failure, create a
+shareable report as the runtime user:
+
+```bash
+python3 deploy/scripts/collect-diagnostics.py
+```
+
+Review the printed `share-diagnostics-*.txt` file and attach it to your support
+chat, or copy its text. It includes only the latest launch logs, with common
+credential patterns and URLs redacted; redaction is best effort. Configuration,
+saved identity files, and provider profiles are not collected. Nothing is
+uploaded automatically. Logs are local, Git-ignored, and retained until removed.
+
 ```bash
 uv run pytest
 uv run ruff check .
