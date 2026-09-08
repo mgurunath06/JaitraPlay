@@ -1,6 +1,7 @@
 export interface Zone { id: string; name: string; x: number; y: number; width: number; height: number }
 export interface SetupSettings {
   microphoneId: string;
+  microphoneProcessing?: boolean;
   cameraId: string;
   preferGpu: boolean;
   zones: Zone[];
@@ -13,6 +14,7 @@ export function readSettings(): SetupSettings {
     const data = JSON.parse(localStorage.getItem(key) ?? "{}") as Partial<SetupSettings>;
     return {
       microphoneId: typeof data.microphoneId === "string" ? data.microphoneId : "",
+      microphoneProcessing: data.microphoneProcessing === true,
       cameraId: typeof data.cameraId === "string" ? data.cameraId : "",
       preferGpu: data.preferGpu === true,
       zones: Array.isArray(data.zones) ? data.zones.filter((z) => z && typeof z.name === "string" && z.name.length <= 30 && typeof z.id === "string" && [z.x, z.y, z.width, z.height].every((n) => Number.isFinite(n) && n >= 0 && n <= 1) && z.width > 0 && z.height > 0 && z.x + z.width <= 1.001 && z.y + z.height <= 1.001).slice(0, 8) : [],

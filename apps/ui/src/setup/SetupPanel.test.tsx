@@ -13,7 +13,7 @@ it("runs a short microphone test and saves only an explicit correction", async (
   vi.stubGlobal("navigator", { mediaDevices: { enumerateDevices: vi.fn().mockResolvedValue([]) } });
   render(<SetupPanel onClose={vi.fn()} />);
   await act(async () => Promise.resolve());
-  expect(screen.getByLabelText("Test word")).toHaveValue("mimo");
+  expect(screen.getByLabelText("Test word")).toHaveValue("blue");
   fireEvent.change(screen.getByLabelText("Test word"), { target: { value: "red" } });
   fireEvent.click(screen.getByRole("button", { name: /Speak answer/ }));
   await act(async () => Promise.resolve());

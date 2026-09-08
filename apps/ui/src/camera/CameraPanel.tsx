@@ -1,3 +1,4 @@
+import { diagnostic } from "../app/diagnostics";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { SetupSettings, Zone } from "../setup/settings";
 import { observe, type Landmark, type Observation, type WristSample } from "./observe";
@@ -43,7 +44,9 @@ export function CameraPanel({ settings, onZones, onStarted, simple = false }: { 
     cleanup(); const token = generation.current;
     setState("starting"); setError(""); setObservation(empty);
     const history: WristSample[] = [];
-    const fail = (message: string) => { if (generation.current === token) { stop(); setError(message); } };
+    let lastDiagnostic = 0;
+    diagnostic("camera.start");
+    const fail = (message: string) => { diagnostic("camera.error", { reason: message.replace(/[^a-zA-Z0-9 .-]/g, "").slice(0, 100) }); if (generation.current === token) { stop(); setError(message); } };
     try {
       const videoConstraints = { width: { ideal: 640 }, height: { ideal: 480 } };
       let media: MediaStream;
@@ -72,7 +75,7 @@ export function CameraPanel({ settings, onZones, onStarted, simple = false }: { 
         if (generation.current !== token) return;
         if (element.readyState < 2 || element.currentTime === lastVideoTime) {
           if (performance.now() - lastFrameAt > 3000) { fail("Camera frames stopped. Check the device and try again."); return; }
-          frameTimer.current = window.setTimeout(() => void sendFrame(), 200);
+          frameTimer.current = window.setTimeout(() => void sendFrame(), 80);
           return;
         }
         lastVideoTime = element.currentTime;
@@ -88,11 +91,16 @@ export function CameraPanel({ settings, onZones, onStarted, simple = false }: { 
         if (generation.current !== token) return;
         window.clearTimeout(watchdog.current);
         if (data.type === "error") { fail(data.message); return; }
-        if (data.type === "ready") { setBackend(data.backend); setState("on"); onStarted?.(); void sendFrame(); }
+        if (data.type === "ready") { diagnostic("camera.ready", { backend: data.backend }); setBackend(data.backend); setState("on"); onStarted?.(); void sendFrame(); }
         if (data.type === "result") {
-          setObservation(observe(data.landmarks, settingsRef.current.zones, history, data.time));
+          const observation = observe(data.landmarks, settingsRef.current.zones, history, data.time);
+          setObservation(observation);
+          if (data.time - lastDiagnostic >= 2000) {
+            lastDiagnostic = data.time;
+            diagnostic("camera.observation", { people: data.landmarks.length, gesture: observation.gesture, durationMs: Math.round(performance.now() - data.time), visibility: Math.min(...[11, 12, 15, 16].map(i => data.landmarks[0]?.[i]?.visibility ?? 0)) });
+          }
           setPoints(data.landmarks.length === 1 ? data.landmarks[0] : []);
-          frameTimer.current = window.setTimeout(() => void sendFrame(), 200);
+          frameTimer.current = window.setTimeout(() => void sendFrame(), 80);
         }
       };
       process.postMessage({ type: "init", preferGpu: simple ? false : settings.preferGpu });
@@ -133,6 +141,7 @@ export function CameraPanel({ settings, onZones, onStarted, simple = false }: { 
       {drawing && <p role="status">{corner ? "Click the opposite corner." : "Click the first corner of the floor area."}</p>}
       {settings.zones.map(zone => <div key={zone.id}>{zone.name} <button aria-label={`Remove ${zone.name}`} onClick={() => onZones(settings.zones.filter(z => z.id !== zone.id))}>Remove</button></div>)}
     </div></details>}
+    <p>Supported gestures: raise one hand, raise both hands, or wave side to side twice at chest height or higher. Keep shoulders and wrists visible; finger signs are not recognised.</p>
     <p className="camera-note">{simple ? "When you see “One person visible” and “Hand raised”, the camera is ready." : "Approximate position of a visible person, not identity or distance. No video is saved. Moving the camera requires new room zones."}</p>
   </section>;
 }

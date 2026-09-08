@@ -7,14 +7,17 @@ import logging
 import os
 import re
 import secrets
+import time
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
+from urllib.parse import urlsplit
 from uuid import uuid4
 
 from jaitra_core.api.models import StorybookLibraryItem, StorybookPage, StorybookSnapshot
+from jaitra_core.observability.logging import log_event
 
 logger = logging.getLogger(__name__)
 TextProvider = Literal["mwapi", "startupapi", "openrouter"]
@@ -74,17 +77,16 @@ class StorybookService:
     def __init__(self, repository_root: Path, state_dir: Path) -> None:
         self.repository_root = repository_root
         self.storage_root = state_dir / "storybooks"
-        self.character_bible = (
-            repository_root / "docs" / "CHARACTER_BIBLE.md"
-        ).read_text(encoding="utf-8")
-        self.character_anchor = (
-            repository_root / "content" / "characters" / "character-lineup.png"
+        self.character_bible = (repository_root / "docs" / "CHARACTER_BIBLE.md").read_text(
+            encoding="utf-8"
         )
+        self.character_anchor = repository_root / "content" / "characters" / "character-lineup.png"
         self.image_model = os.environ.get(
             "JAITRA_STORY_IMAGE_MODEL", "bytedance-seed/seedream-5-0-lite"
         )
         self._jobs: dict[str, _StoryJob] = {}
         self._tasks: set[asyncio.Task[None]] = set()
+        self._image_slots = asyncio.Semaphore(2)
         self._load_saved()
 
     def start(self, requested_topic: str | None) -> StorybookSnapshot:
@@ -128,10 +130,11 @@ class StorybookService:
         job = self._jobs.get(story_id)
         if job is None or not 1 <= page_number <= 15:
             raise StorybookNotFound(story_id)
-        path = self.storage_root / story_id / f"page-{page_number:02d}.png"
-        if not path.is_file():
-            raise StorybookNotFound(story_id)
-        return path
+        for extension in ("png", "jpg", "webp"):
+            path = self.storage_root / story_id / f"page-{page_number:02d}.{extension}"
+            if path.is_file():
+                return path
+        raise StorybookNotFound(story_id)
 
     def stop(self) -> None:
         for task in self._tasks:
@@ -139,6 +142,9 @@ class StorybookService:
         self._tasks.clear()
 
     async def _run(self, job: _StoryJob) -> None:
+        stage = "planning"
+        started = time.monotonic()
+        self._event("STORY_START", storyId=job.snapshot.story_id)
         try:
             title, outline, provider = await asyncio.to_thread(
                 self._generate_outline, job.snapshot.topic
@@ -153,7 +159,8 @@ class StorybookService:
             ]
             self._save_snapshot(job.snapshot)
 
-            semaphore = asyncio.Semaphore(2)
+            stage = "illustrating"
+            semaphore = self._image_slots
 
             async def illustrate(page_number: int, page: _OutlinePage) -> None:
                 async with semaphore:
@@ -164,25 +171,31 @@ class StorybookService:
                 job.snapshot.completed_pages += 1
                 self._save_snapshot(job.snapshot)
 
-            await asyncio.gather(
-                *(
-                    illustrate(page_number, page)
-                    for page_number, page in enumerate(outline, start=1)
-                )
+            async with asyncio.TaskGroup() as group:
+                for page_number, page in enumerate(outline, start=1):
+                    group.create_task(illustrate(page_number, page))
+            self._event(
+                "STORY_READY",
+                storyId=job.snapshot.story_id,
+                durationMs=round((time.monotonic() - started) * 1000),
             )
             job.snapshot.status = "ready"
             self._save_snapshot(job.snapshot)
         except asyncio.CancelledError:
             raise
         except Exception as exc:
-            logger.warning("STORYBOOK_GENERATION_FAILED error=%s", type(exc).__name__)
+            self._event(
+                "STORY_FAILED", storyId=job.snapshot.story_id, stage=stage, **self._failure(exc)
+            )
             job.snapshot.status = "failed"
-            job.snapshot.error = "The story helpers could not finish this book. Please try again."
+            job.snapshot.error = (
+                "The story text could not be prepared. Check the text provider connection."
+                if stage == "planning"
+                else "Pictures could not be completed. Check OpenRouter image access and credit."
+            ) + f" Support reference: {job.snapshot.story_id[:8]}."
             self._save_snapshot(job.snapshot)
 
-    def _generate_outline(
-        self, topic: str
-    ) -> tuple[str, tuple[_OutlinePage, ...], TextProvider]:
+    def _generate_outline(self, topic: str) -> tuple[str, tuple[_OutlinePage, ...], TextProvider]:
         prompt = self._story_prompt(topic)
         errors: list[str] = []
         for provider, path in self._profile_paths():
@@ -193,24 +206,16 @@ class StorybookService:
                 return title, pages, provider
             except Exception as exc:
                 errors.append(f"{provider}:{type(exc).__name__}")
-                logger.warning(
-                    "STORY_TEXT_PROVIDER_FAILED provider=%s error=%s",
-                    provider,
-                    type(exc).__name__,
-                )
+                self._event("STORY_TEXT_FAILED", provider=provider, **self._failure(exc))
         raise StorybookGenerationError(", ".join(errors) or "no story provider configured")
 
-    def _generate_image(
-        self, story_id: str, page_number: int, page: _OutlinePage
-    ) -> None:
-        profile = self._load_profile(
-            self.repository_root / ".claude" / "settings.openrouter.json"
-        )
+    def _generate_image(self, story_id: str, page_number: int, page: _OutlinePage) -> None:
+        profile = self._load_profile(self.repository_root / ".claude" / "settings.openrouter.json")
         if not self.character_anchor.is_file():
             raise StorybookGenerationError("canonical character anchor is missing")
-        reference = "data:image/png;base64," + base64.b64encode(
-            self.character_anchor.read_bytes()
-        ).decode()
+        reference = (
+            "data:image/png;base64," + base64.b64encode(self.character_anchor.read_bytes()).decode()
+        )
         present = ", ".join(page.characters)
         prompt = (
             "Use case: identity-preserve illustration-story.\n"
@@ -229,9 +234,7 @@ class StorybookService:
         payload = {
             "model": self.image_model,
             "prompt": prompt,
-            "input_references": [
-                {"type": "image_url", "image_url": {"url": reference}}
-            ],
+            "input_references": [{"type": "image_url", "image_url": {"url": reference}}],
             "resolution": "2K",
             "aspect_ratio": "4:3",
             "n": 1,
@@ -249,22 +252,91 @@ class StorybookService:
         )
         last_error: Exception | None = None
         for _attempt in range(2):
+            started = time.monotonic()
+            self._event(
+                "STORY_IMAGE_START",
+                storyId=story_id,
+                page=page_number,
+                attempt=_attempt + 1,
+                model=self.image_model,
+            )
             try:
                 with urllib.request.urlopen(request, timeout=240) as response:
-                    result = json.loads(response.read())
+                    result = json.loads(response.read(36_000_000))
                 image = base64.b64decode(result["data"][0]["b64_json"], validate=True)
-                if not image.startswith(b"\x89PNG\r\n\x1a\n") or len(image) > 25_000_000:
-                    raise StorybookGenerationError("image provider returned invalid media")
+                extension = self._image_extension(image)
                 directory = self.storage_root / story_id
                 directory.mkdir(parents=True, exist_ok=True)
                 temporary = directory / f"page-{page_number:02d}.tmp"
-                final = directory / f"page-{page_number:02d}.png"
+                final = directory / f"page-{page_number:02d}.{extension}"
                 temporary.write_bytes(image)
                 temporary.replace(final)
+                self._event(
+                    "STORY_IMAGE_READY",
+                    storyId=story_id,
+                    page=page_number,
+                    format=extension,
+                    durationMs=round((time.monotonic() - started) * 1000),
+                )
                 return
-            except (OSError, ValueError, KeyError, json.JSONDecodeError) as exc:
+            except (
+                OSError,
+                ValueError,
+                KeyError,
+                IndexError,
+                TypeError,
+                StorybookGenerationError,
+            ) as exc:
                 last_error = exc
+                self._event(
+                    "STORY_IMAGE_FAILED",
+                    storyId=story_id,
+                    page=page_number,
+                    attempt=_attempt + 1,
+                    **self._failure(exc),
+                )
+                if isinstance(exc, urllib.error.HTTPError) and exc.code not in {
+                    408,
+                    429,
+                    500,
+                    502,
+                    503,
+                    504,
+                }:
+                    break
         raise StorybookGenerationError("image generation failed") from last_error
+
+    @staticmethod
+    def _image_extension(image: bytes) -> str:
+        if not 12 <= len(image) <= 25_000_000:
+            raise StorybookGenerationError("invalid image size")
+        if image.startswith(b"\x89PNG\r\n\x1a\n"):
+            return "png"
+        if image.startswith(b"\xff\xd8\xff"):
+            return "jpg"
+        if image.startswith(b"RIFF") and image[8:12] == b"WEBP":
+            return "webp"
+        raise StorybookGenerationError("unsupported image format")
+
+    @staticmethod
+    def _event(code: str, **payload: object) -> None:
+        log_event(
+            logger,
+            logging.WARNING if "FAILED" in code else logging.INFO,
+            code,
+            "storybook",
+            payload=payload,
+        )
+
+    @staticmethod
+    def _failure(exc: BaseException) -> dict[str, object]:
+        # Preserve actionable status/type without logging prompts, credentials or response bodies.
+        if isinstance(exc, BaseExceptionGroup):
+            return StorybookService._failure(exc.exceptions[0])
+        cause = exc
+        while cause.__cause__ is not None:
+            cause = cause.__cause__
+        return {"error": type(cause).__name__, "httpStatus": getattr(cause, "code", None)}
 
     def _story_prompt(self, topic: str) -> str:
         return (
@@ -279,8 +351,8 @@ class StorybookService:
             "shame, stereotypes, brands, purchases, secrets from caregivers, unsafe behavior, and "
             "requests for personal information. Do not mention AI or the reader. Keep character "
             "behavior consistent with the canonical bible below. Return JSON only with this exact "
-            "shape: {\"title\":\"...\",\"pages\":[{\"text\":\"...\",\"characters\":[\"Mimo\"],"
-            "\"scene\":\"...\"}]}. Every characters value must use only the four exact canonical "
+            'shape: {"title":"...","pages":[{"text":"...","characters":["Mimo"],'
+            '"scene":"..."}]}. Every characters value must use only the four exact canonical '
             "names. Scene descriptions must specify only visible action and setting; do not put "
             "written words, letters, or numbers in the illustration.\n\n"
             f"{self.character_bible}"
@@ -344,10 +416,20 @@ class StorybookService:
     @staticmethod
     def _load_profile(path: Path) -> dict[str, str]:
         data = json.loads(path.read_text(encoding="utf-8"))["env"]
-        return {
-            "base_url": str(data["ANTHROPIC_BASE_URL"]).rstrip("/"),
-            "token": str(data["ANTHROPIC_AUTH_TOKEN"]),
-        }
+        base = str(data.get("OPENAI_BASE_URL") or data.get("ANTHROPIC_BASE_URL") or "").rstrip("/")
+        token = str(data.get("OPENAI_API_KEY") or data.get("ANTHROPIC_AUTH_TOKEN") or "").strip()
+        parsed = urlsplit(base)
+        if (
+            parsed.scheme != "https"
+            or not parsed.hostname
+            or parsed.username
+            or parsed.password
+            or not token
+        ):
+            raise StorybookGenerationError("invalid provider configuration")
+        if parsed.hostname == "openrouter.ai":
+            base = "https://openrouter.ai/api/v1"
+        return {"base_url": base, "token": token}
 
     @staticmethod
     def _request_text(provider: TextProvider, profile: dict[str, str], prompt: str) -> str:
@@ -361,7 +443,7 @@ class StorybookService:
             }
             headers = {"authorization": f"Bearer {profile['token']}"}
         else:
-            url = f"{profile['base_url']}/v1/messages"
+            url = f"{profile['base_url'].removesuffix('/v1')}/v1/messages"
             payload = {
                 "model": "claude-sonnet-4-6",
                 "temperature": 0.7,
@@ -416,7 +498,10 @@ class StorybookService:
                 ):
                     continue
                 if not all(
-                    (path.parent / f"page-{page.page_number:02d}.png").is_file()
+                    any(
+                        (path.parent / f"page-{page.page_number:02d}.{ext}").is_file()
+                        for ext in ("png", "jpg", "webp")
+                    )
                     for page in snapshot.pages
                 ):
                     continue

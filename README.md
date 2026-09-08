@@ -97,15 +97,19 @@ npm run electron:dev
 ## Verification
 
 The Ubuntu `./run.sh` launcher saves each run under `.local/logs/run-*`, including
-build/Electron output in `launcher.log` and backend output in `core.log`. The
+build/Electron output in `launcher.log`, backend output in `core.log`, and
+structured frontend events in `diagnostics.jsonl` (2 MiB plus one rotated backup). The
 launcher prints the log directory and exit status. After a failure, create a
 shareable report as the runtime user:
 
 ```bash
-python3 deploy/scripts/collect-diagnostics.py
+python3 deploy/scripts/collect-diagnostics.py --print
 ```
 
-Review the printed `share-diagnostics-*.txt` file and attach it to your support
+The command also prints the report for copying directly into chat. It includes
+up to the last 1 MiB of each log, with timestamps, request/story IDs, capture
+levels, gesture summaries, and provider HTTP status. No automatic chat upload is
+configured. Review the printed `share-diagnostics-*.txt` file and attach it to your support
 chat, or copy its text. It includes only the latest launch logs, with common
 credential patterns and URLs redacted; redaction is best effort. Configuration,
 saved identity files, and provider profiles are not collected. Nothing is
@@ -165,7 +169,7 @@ The systemd core launcher includes the voice extra. In development, run Vite and
 as described above. Use `--extra voice` with `uv run` to keep the optional package installed.
 
 In Picture Guess, Colour Quest quizzes, or Riddle Garden, select **Speak answer** and say one
-visible answer such as “blue”, “elephant”, or “three”. Listening stops after four seconds and a
+visible answer such as “blue”, “elephant”, or “three”. Listening stops after 6.5 seconds and a
 clear match is submitted automatically. Recognition is limited to the visible choices, improving
 accuracy and preventing unrelated speech from selecting an answer. Touch controls remain available.
 Memory cards and room hunts currently use touch controls.
@@ -182,8 +186,12 @@ mode also needs microphone permission. WSL microphone forwarding depends on the 
 recognition quality, especially for young children, accents, and room noise, needs testing on
 the actual appliance. Missing/denied microphones show a retry message instead of blocking play.
 
-Capture uses the device's default audio rate (16, 44.1 or 48 kHz), with browser echo
-cancellation, noise suppression and automatic gain control requested. No additional
+Capture uses the device's default audio rate (16, 44.1 or 48 kHz), with optional browser echo
+cancellation, noise suppression and automatic gain control selected in Setup.
+These are off by default to avoid double-processing conference microphones.
+A live meter shows incoming sound; quiet PCM receives bounded gain up to 8x.
+For multichannel inputs, capture uses the strongest channel rather than assuming
+the first channel contains speech. No additional
 cleanup API is required. The microphone tracks and audio context are closed after
 capture. A “sent silence” message means check mute/input volume; “sent no audio”
 means the capture pipeline delivered no samples. A recognition failure means check
@@ -339,3 +347,16 @@ The latest report is `.local/state/provider-health.json`. These are real, small
 text-generation requests and consume provider usage. A systemd timer can run them
 every 30 minutes, including when the app is closed. See
 [installation and report details](cloud.md#independent-provider-health-checks).
+
+
+September 8 appliance fixes: menus are top-left and the Jaitra Labs logo remains
+bottom-left, with 60% transparency during games. Setup starts voice practice with
+“blue”; this is a capture/recognition test, not acoustic-model training. Camera
+supports a raised hand, both hands raised, and side-to-side waves at chest height
+or above. Thresholds scale with shoulder width; arbitrary finger signs are not
+supported. Actual EMEET range and child gesture accuracy require appliance trials.
+
+Storybook accepts PNG, JPEG, and WebP output and serves the matching MIME type.
+This follows the [OpenRouter image response documentation](https://openrouter.ai/docs/guides/overview/multimodal/image-generation),
+which permits multiple output formats. Provider failures now log stage, HTTP
+status and story/page references without prompts or response bodies.

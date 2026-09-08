@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Export bounded, best-effort-redacted logs; never upload or read configuration."""
 
+import argparse
 import re
 from datetime import UTC, datetime
 from pathlib import Path
@@ -20,6 +21,14 @@ def redact(text: str) -> str:
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--print",
+        action="store_true",
+        dest="print_report",
+        help="Also print the redacted report for copying into chat",
+    )
+    args = parser.parse_args()
     root = Path(__file__).resolve().parents[2]
     logs = root / ".local/logs"
     try:
@@ -35,11 +44,11 @@ def main() -> None:
     sections = [
         "JAITRA Play diagnostics",
         f"Run: {name}",
-        "Only latest launcher/core logs are included (last 128 KiB each).",
+        "Latest launcher/core and structured diagnostics are included (last 1 MiB each).",
         "No config, environment dump, profiles, recordings, or saved identity files included.",
         "Redaction is best effort. Review before sharing; logs may contain personal text.",
     ]
-    for filename in ("launcher.log", "core.log"):
+    for filename in ("launcher.log", "core.log", "diagnostics.jsonl.1", "diagnostics.jsonl"):
         path = run / filename
         sections.append(f"\n--- {filename} ---")
         try:
@@ -47,7 +56,7 @@ def main() -> None:
                 raise ValueError("Refusing symbolic link")
             with path.open("rb") as source:
                 source.seek(0, 2)
-                source.seek(max(0, source.tell() - 128 * 1024))
+                source.seek(max(0, source.tell() - 1024 * 1024))
                 sections.append(redact(source.read().decode("utf-8", errors="replace")))
         except (OSError, ValueError) as error:
             sections.append(f"Unavailable: {error}")
@@ -57,6 +66,8 @@ def main() -> None:
         output.chmod(0o600)
         target.write("\n".join(sections) + "\n")
     print(f"Report created: {output}")
+    if args.print_report:
+        print("\n".join(sections))
     print("Review it, then attach the text file to the chat. Nothing was uploaded.")
 
 

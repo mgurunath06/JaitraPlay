@@ -1,10 +1,11 @@
+import { diagnostic } from "../app/diagnostics";
 import { quietMimo } from "../components/mimo";
 import { readSettings } from "../setup/settings";
 export interface Recording { stop(): Promise<{ audio: string; sampleRate: number }>; cancel(): void }
 
 export class CaptureError extends Error {}
 
-export function encodePcm(chunks: Float32Array[], maxSamples: number): string {
+export function encodePcm(chunks: Float32Array[], maxSamples: number, gain = 1): string {
   const length = Math.min(maxSamples, chunks.reduce((total, chunk) => total + chunk.length, 0));
   const bytes = new Uint8Array(length * 2);
   const view = new DataView(bytes.buffer);
@@ -12,7 +13,7 @@ export function encodePcm(chunks: Float32Array[], maxSamples: number): string {
   for (const chunk of chunks) {
     for (const sample of chunk) {
       if (offset >= length) break;
-      const clamped = Math.max(-1, Math.min(1, sample));
+      const clamped = Math.max(-1, Math.min(1, sample * gain));
       view.setInt16(offset++ * 2, Math.round(clamped * (clamped < 0 ? 32768 : 32767)), true);
     }
   }
@@ -21,16 +22,19 @@ export function encodePcm(chunks: Float32Array[], maxSamples: number): string {
   return btoa(binary);
 }
 
-export async function recordVoice(signal: AbortSignal): Promise<Recording> {
+export async function recordVoice(signal: AbortSignal, onLevel?: (rms: number) => void): Promise<Recording> {
   quietMimo();
-  const deviceId = readSettings().microphoneId;
-  const audio = { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true };
+  const settings = readSettings();
+  const deviceId = settings.microphoneId;
+  const processing = settings.microphoneProcessing === true;
+  const audio = { echoCancellation: processing, noiseSuppression: processing, autoGainControl: processing };
+  diagnostic("voice.capture.start", { processing });
   let stream: MediaStream;
   try {
     stream = await navigator.mediaDevices.getUserMedia({ audio: { ...audio, ...(deviceId ? { deviceId: { exact: deviceId } } : {}) }, video: false });
   } catch (error) {
     if (!deviceId || !(error instanceof DOMException) || !["NotFoundError", "OverconstrainedError"].includes(error.name)) throw error;
-    stream = await navigator.mediaDevices.getUserMedia({ audio, video: false });
+    throw new CaptureError("The saved microphone is disconnected. Select your EMEET input again in Setup.");
   }
   const closeTracks = () => stream.getTracks().forEach((track) => track.stop());
   if (signal.aborted) { closeTracks(); throw new Error("Cancelled"); }
@@ -44,6 +48,11 @@ export async function recordVoice(signal: AbortSignal): Promise<Recording> {
   let samples = 0;
   let closed = false;
   let peak = 0;
+  let squareSum = 0;
+  let lastMeter = 0;
+  const track = stream.getTracks()[0];
+  const actual = track?.getSettings?.();
+  diagnostic("voice.device", { sampleRate: actual?.sampleRate ?? context.sampleRate, channels: actual?.channelCount ?? 0, muted: track?.muted ?? false, enabled: track?.enabled ?? true });
   const cancel = () => {
     if (closed) return;
     closed = true;
@@ -67,7 +76,13 @@ export async function recordVoice(signal: AbortSignal): Promise<Recording> {
       if (closed || samples >= context.sampleRate * 8) return;
       chunks.push(event.data);
       samples += event.data.length;
-      for (const sample of event.data) peak = Math.max(peak, Math.abs(sample));
+      let frameSquares = 0;
+      for (const sample of event.data) { peak = Math.max(peak, Math.abs(sample)); frameSquares += sample * sample; }
+      squareSum += frameSquares;
+      if (samples - lastMeter >= context.sampleRate / 10) {
+        lastMeter = samples;
+        onLevel?.(Math.sqrt(frameSquares / Math.max(1, event.data.length)));
+      }
     };
     source.connect(node);
     node.connect(context.destination); // Worklet outputs silence, preventing microphone feedback.
@@ -76,12 +91,20 @@ export async function recordVoice(signal: AbortSignal): Promise<Recording> {
       cancel,
       stop: async () => {
         cancel();
-        const audio = encodePcm(chunks, context.sampleRate * 8);
+        const rms = Math.sqrt(squareSum / Math.max(1, samples));
+        const gain = captureGain(rms, peak);
+        diagnostic("voice.capture.finish", { samples, sampleRate: context.sampleRate, peak, rms, gain, durationMs: Math.round(samples / context.sampleRate * 1000) });
+        const audio = encodePcm(chunks, context.sampleRate * 8, gain);
         chunks.length = 0;
         if (!samples) throw new CaptureError("The microphone opened but sent no audio. Check the selected microphone and system input settings.");
         if (peak < 1 / 32768) throw new CaptureError("The microphone sent silence. Check mute, input volume, and the selected microphone in Setup.");
         return { audio, sampleRate: context.sampleRate };
       },
     };
-  } catch (error) { cancel(); throw error; }
+  } catch (error) { diagnostic("voice.capture.error", { error: error instanceof Error ? error.name : "UnknownError" }); cancel(); throw error; }
+}
+
+// Bounded amplification improves quiet PCM without clipping or amplifying digital silence.
+export function captureGain(rms: number, peak: number): number {
+  return rms > 0.0001 && peak > 0 ? Math.max(1, Math.min(8, 0.06 / rms, 0.9 / peak)) : 1;
 }

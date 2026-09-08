@@ -69,8 +69,13 @@ Jaitra recognition and voice capture fixes). During this conversation:
 
 Commands were run from `/opt/jaitraplay`. Exact current Ubuntu HEAD has not been
 shown after the update; do not equate successful build output with a verified Git
-commit. Updated core/UI startup, microphone/camera trials, saved recognition, and
-reboot behavior have **not yet been confirmed**.
+commit. Subsequent owner logs proved a successful build and CORE_READY, followed
+by Electron's chrome-sandbox ownership/mode failure. Owner confirmed applying
+root:root ownership and mode 4755 to `node_modules/electron/dist/chrome-sandbox`.
+Subsequent interactive feedback establishes app use, but saved recognition and
+reboot acceptance remain unverified. `npm ci` may replace that helper; if the same
+sandbox error returns, repair its ownership/mode again rather than disabling the
+production sandbox.
 
 ## Repository launcher and Ubuntu transition
 
@@ -84,10 +89,10 @@ process on exit and fails if the core exits or readiness times out. No NVM is
 required. Shell syntax was checked locally; graphical Ubuntu execution remains
 unverified. Run as `admin2` in the Ubuntu desktop session.
 
-**Ubuntu transition is pending:** `/opt/jaitraplay/run.sh` was previously local
-and untracked. Back it up/move it outside the checkout before pulling this new
-tracked file, otherwise Git may refuse to overwrite it. Preserve the backup until
-the repository launcher has been tested. Give the owner one step at a time.
+**Ubuntu now uses the tracked launcher:** owner acknowledged backing up the old
+local script and pulling, and supplied a report from the new logger. Future updates
+use a normal fast-forward pull; do not repeat the untracked-file migration.
+Give the owner one step at a time.
 
 `run-jaitra.sh` remains a separate local/untracked Ubuntu launcher, owned by
 `remoteadmin:jaitra`; it is not available in this development checkout. Earlier
@@ -139,15 +144,15 @@ sudo -u admin2 -H python3 /opt/jaitraplay/deploy/scripts/collect-diagnostics.py
 ```
 
 This prints the path of a `share-diagnostics-*.txt` file containing at most the
-last 128 KiB of each latest-run log. It excludes config, environment dumps,
+last 1 MiB of each latest-run log. It excludes config, environment dumps,
 provider profiles, recordings, and identity files. Common credential patterns
 and URLs are redacted, but this is best effort: review the report before sharing.
 The report has mode 600. To read it remotely, use `sudo -u admin2 cat` with the
 exact printed path, then copy the text into chat; alternatively attach the file
 from the Ubuntu desktop. Give these actions one at a time to the owner.
 
-Logging changes and collector require pulling the update onto Ubuntu. Actual
-Ubuntu startup and log sharing remain pending owner verification.
+Original logging/collector use was verified by owner-supplied output. Expanded
+structured diagnostics described below require pulling the new update.
 
 ## Provider timer details
 
@@ -175,3 +180,58 @@ An on-demand `sudo systemctl start jaitra-provider-health.service` makes real AP
 requests and consumes usage. Pulling checker code does not require reinstalling
 the timer. If installed unit definitions change, update the installed files before
 daemon-reload/restart; daemon-reload alone does not copy repository templates.
+
+
+## September 8 feedback fixes and current acceptance boundary
+
+Owner reported: logo missing in games, controls at top-right, EMEET speech not
+recognised despite normal external recordings, tracked hand/person but no gesture,
+and repeated storybook failure. Implemented changes:
+
+- Persistent bottom-left logo on every screen, opacity 0.4 in games (60%
+  transparency). App controls and Setup/identity close controls are left-aligned.
+- Voice: live input meter, browser noise-cleanup toggle (off by default for
+  hardware-processed speakerphones), strongest-channel capture, bounded quiet PCM
+  gain up to 8x, 6.5-second answer window, and explicit missing-device errors.
+  Setup starts with `blue` rather than the model-unfriendly proper name `Mimo`.
+  Recognition remains local Vosk. No acoustic voice training or cloud audio upload.
+- Gestures: shoulder-relative distances for raised hands and waves, chest-height
+  waves, a three-second movement history, and shorter camera scheduling delay.
+  Identity enrollment uses the same raised-hand rule. Multiple-person ambiguity
+  and explicit enrollment confirmation remain. Supported gestures are raised
+  hand(s) and side-to-side waving, not arbitrary finger signs.
+- Storybook: accept PNG/JPEG/WebP with matching file extension and HTTP MIME type,
+  normalize OpenRouter profile base URL, accept OpenAI-style profile keys, avoid
+  duplicated `/v1` on text requests, and stop queued page work on failure.
+  Requests still use the configured model and canonical reference; no silent
+  substitute illustrations. Provider HTTP status, story/page IDs, and stages are
+  logged without response bodies or story prompts. Error screens identify the
+  stage and a support reference. Live paid generation has not been tested here.
+- Diagnostics: renderer errors, capture levels/rate/gain, recognition word count,
+  gesture summaries and inference time, request ID correlation across Electron
+  and core, and provider stage/status. No raw audio/video, face descriptors,
+  device IDs, transcripts, or prompts are emitted by the new diagnostic events.
+  `diagnostics.jsonl` rotates at 2 MiB with one backup per run. Existing launcher
+  and core stdout logs remain local and unrotated.
+
+One-command report creation AND display, from the remote maintenance terminal:
+
+```bash
+sudo -u admin2 -H python3 /opt/jaitraplay/deploy/scripts/collect-diagnostics.py --print
+```
+
+Review then paste the output into chat (or attach the generated file). This does
+not automatically upload to a chat; no authenticated chat-upload integration is
+configured. The collector includes latest launcher/core logs and both structured
+diagnostic segments, last 1 MiB each, with best-effort redaction.
+
+Tests cover quiet gain, missing selected microphone, multichannel worklet capture,
+distant chest-height waves, body-motion rejection, image format handling, profile
+normalization, provider status redaction, and report export. Local Electron visual
+checks use mock APIs and a temporary WSL-only harness; they do not establish Ubuntu
+camera/microphone performance. Across-room EMEET recognition and the actual
+storybook provider failure still require a physical retry with the new diagnostics.
+
+Next deployment: fast-forward pull as `remoteadmin`, then run `./run.sh` from
+`admin2`'s graphical desktop. No dependency changes require `npm ci` for this update.
+If failures remain, use the report command above before proposing further fixes.

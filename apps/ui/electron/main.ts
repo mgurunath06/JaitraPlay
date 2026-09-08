@@ -1,5 +1,6 @@
 import { app, BrowserWindow, ipcMain, session } from "electron";
 import { randomUUID } from "node:crypto";
+import { appendFileSync, mkdirSync, renameSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -23,6 +24,17 @@ if (isWsl || process.env.JAITRA_SOFTWARE_RENDERING === "1") {
   app.commandLine.appendSwitch("enable-unsafe-swiftshader");
 }
 
+function trace(event: string, data: Record<string, unknown> = {}) {
+  const record = JSON.stringify({ ts: new Date().toISOString(), component: "electron", event, ...data });
+  try {
+    const root = process.env.JAITRA_RUN_LOG_DIR ?? join(directory, "../.local/logs");
+    mkdirSync(root, { recursive: true, mode: 0o700 });
+    const path = join(root, "diagnostics.jsonl");
+    try { if (statSync(path).size > 2 * 1024 * 1024) renameSync(path, `${path}.1`); } catch { /* First event. */ }
+    appendFileSync(path, record + "\n", { mode: 0o600 });
+  } catch { console.error("JAITRA_DIAGNOSTIC_WRITE_FAILED"); }
+}
+
 function coreEndpoint(path: string): string {
   const url = new URL(path, coreUrl);
   if (!['127.0.0.1', 'localhost', '::1'].includes(url.hostname)) {
@@ -36,12 +48,23 @@ async function coreRequest(
   init?: RequestInit,
   timeoutMilliseconds = 2000,
 ): Promise<unknown> {
-  const response = await fetch(coreEndpoint(path), {
-    ...init,
-    signal: AbortSignal.timeout(timeoutMilliseconds),
-  });
-  if (!response.ok) throw new Error(`Core request failed: ${response.status}`);
-  return response.json();
+  const requestId = randomUUID();
+  const started = Date.now();
+  const route = path.replace(/[0-9a-f]{8}-[0-9a-f-]{27}/g, ":id");
+  trace("api.start", { requestId, route });
+  try {
+    const response = await fetch(coreEndpoint(path), {
+      ...init,
+      headers: { ...init?.headers, "X-Request-ID": requestId },
+      signal: AbortSignal.timeout(timeoutMilliseconds),
+    });
+    trace("api.finish", { requestId, route, status: response.status, durationMs: Date.now() - started });
+    if (!response.ok) throw new Error(`Core request failed: ${response.status}`);
+    return response.json();
+  } catch (error) {
+    trace("api.error", { requestId, route, error: error instanceof Error ? error.name : "UnknownError", durationMs: Date.now() - started });
+    throw error;
+  }
 }
 
 function validStoryId(value: unknown): value is string {
@@ -57,6 +80,20 @@ async function coreImageRequest(path: string): Promise<string> {
 }
 
 function installIpcHandlers(): void {
+  let diagnosticWindow = Date.now(), diagnosticCount = 0;
+  ipcMain.on("jaitra:diagnostic", (event, name: unknown, data: unknown) => {
+    if (event.sender !== mainWindow?.webContents || event.senderFrame !== mainWindow.webContents.mainFrame) return;
+    if (Date.now() - diagnosticWindow > 1000) { diagnosticWindow = Date.now(); diagnosticCount = 0; }
+    if (++diagnosticCount > 20 || typeof name !== "string" || !/^[a-z.]{1,60}$/.test(name) || !data || typeof data !== "object") return;
+    const allowed = new Set(["source", "error", "line", "column", "sampleRate", "samples", "peak", "rms", "gain", "durationMs", "processing", "muted", "enabled", "channels", "people", "gesture", "backend", "visibility", "matched", "words", "stage", "status", "storyId", "frames", "reason"]);
+    const safe: Record<string, string | number | boolean> = {};
+    for (const [key, value] of Object.entries(data).slice(0, 24)) {
+      if (!allowed.has(key)) continue;
+      if (typeof value === "number" && Number.isFinite(value) || typeof value === "boolean") safe[key] = value;
+      else if (typeof value === "string" && /^[a-zA-Z0-9_. :/-]{0,100}$/.test(value)) safe[key] = value;
+    }
+    trace(name, safe);
+  });
   ipcMain.handle("jaitra:identity", (event, action: unknown, profile: unknown) => {
     if (event.sender !== mainWindow?.webContents || event.senderFrame !== mainWindow.webContents.mainFrame) throw new Error("Unknown sender");
     if (action !== "get" && action !== "save" && action !== "delete") throw new Error("Invalid identity operation");
@@ -145,6 +182,8 @@ function createWindow(): BrowserWindow {
     },
   });
 
+  window.webContents.on("render-process-gone", (_event, details) => trace("renderer.gone", { reason: details.reason, exitCode: details.exitCode }));
+  window.on("unresponsive", () => trace("renderer.unresponsive"));
   window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
   window.webContents.on("will-navigate", (event) => event.preventDefault());
   window.webContents.on("preload-error", (_event, preloadPath, error) => {

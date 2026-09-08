@@ -40,7 +40,7 @@ describe("voice answers", () => {
     expect(onAnswer).toHaveBeenCalledWith("blue");
     expect(coreClient.transcribe).toHaveBeenCalledWith(expect.objectContaining({ phrases: ["blue", "red", "3", "three"] }));
   });
-  it("stops after four seconds and cancels on leaving the round", async () => {
+  it("stops after six and a half seconds and cancels on leaving the round", async () => {
     vi.useFakeTimers();
     const cancel = vi.fn();
     const stop = vi.fn().mockResolvedValue({ audio: "AAAA", sampleRate: 16000 });
@@ -48,9 +48,9 @@ describe("voice answers", () => {
     vi.spyOn(coreClient, "transcribe").mockResolvedValue({ text: "" });
     const { unmount } = render(<VoiceAnswer choices={choices} onAnswer={vi.fn()} />);
     fireEvent.click(screen.getByRole("button", { name: /Speak answer/ }));
-    await act(async () => { await vi.advanceTimersByTimeAsync(4000); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(6500); });
     expect(stop).toHaveBeenCalledOnce();
-    expect(screen.getByRole("status")).toHaveTextContent("didn’t hear");
+    expect(screen.getByRole("status")).toHaveTextContent("no words were recognised");
     fireEvent.click(screen.getByRole("button", { name: /Speak answer/ }));
     await act(async () => Promise.resolve());
     unmount();

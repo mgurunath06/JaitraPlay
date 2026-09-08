@@ -1,3 +1,4 @@
+import { diagnostic } from "../app/diagnostics";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { StorybookLibraryItem, StorybookSnapshot } from "../../../../packages/contracts/src";
 import { coreClient } from "../app/coreClient";
@@ -106,6 +107,7 @@ export function StorybookApp({ onBack, voiceAvailable, onReadingChange }: { onBa
     setView("generating");
     try {
       const created = await coreClient.createStorybook(requestedTopic);
+      diagnostic("story.created", { storyId: created.storyId });
       setStory(created);
     } catch {
       setMessage("The story helpers couldn’t begin. Please try again.");
@@ -122,7 +124,7 @@ export function StorybookApp({ onBack, voiceAvailable, onReadingChange }: { onBa
         if (!active) return;
         setStory(next);
         if (next.status === "ready") { setPageIndex(0); setView("reading"); void refreshLibrary(); }
-        if (next.status === "failed") { setMessage(next.error ?? "The story could not be finished."); setView("error"); }
+        if (next.status === "failed") { diagnostic("story.failed", { storyId: next.storyId }); setMessage(next.error ?? "The story could not be finished."); setView("error"); }
       } catch {
         if (active) { setMessage("The story helpers stopped responding. Please try again."); setView("error"); }
       }

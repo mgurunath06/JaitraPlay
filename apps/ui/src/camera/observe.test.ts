@@ -40,3 +40,27 @@ describe("camera observations", () => {
     expect(observe([p], [], [], 0).presence).toBe("One person visible");
   });
 });
+
+it("recognises a distant chest-height wave relative to shoulder width", () => {
+  const p = pose();
+  p[11] = { x: .46, y: .4, visibility: .9 };
+  p[12] = { x: .54, y: .4, visibility: .9 };
+  p[13].y = .5; p[15].y = .43;
+  p[16].y = .7;
+  const history: WristSample[] = [];
+  let result;
+  for (const [i, x] of [.44, .47, .44, .47].entries()) {
+    p[15].x = x;
+    result = observe([p], [], history, i * 500);
+  }
+  expect(result?.gesture).toBe("Waving");
+});
+
+it("does not interpret whole-body sideways motion as waving", () => {
+  const p = pose(); p[15].y = .2; p[16].y = .8;
+  const history: WristSample[] = [];
+  for (const [i, x] of [.3, .5, .3, .5].entries()) {
+    p[11].x = x; p[12].x = x + .15; p[15].x = x + .1;
+    expect(observe([p], [], history, i * 250).gesture).toBe("Hand raised");
+  }
+});

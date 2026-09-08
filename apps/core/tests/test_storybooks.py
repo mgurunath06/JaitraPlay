@@ -36,9 +36,7 @@ def test_topic_guardrails_and_outline_validation() -> None:
     assert len(pages) == 15
 
 
-def test_background_story_job_tracks_fifteen_images(
-    tmp_path: Path, repository_root: Path
-) -> None:
+def test_background_story_job_tracks_fifteen_images(tmp_path: Path, repository_root: Path) -> None:
     service = StorybookService(repository_root, tmp_path)
 
     def fake_outline(_topic: str) -> tuple[str, tuple[_OutlinePage, ...], str]:
@@ -79,3 +77,59 @@ def test_background_story_job_tracks_fifteen_images(
     assert saved.status == "ready"
     assert saved.completed_pages == 15
     assert restarted.image_path(saved.story_id, 1).is_file()
+
+
+def test_image_formats_and_profile_normalization(tmp_path: Path) -> None:
+    from jaitra_core.providers.storybooks import StorybookGenerationError
+
+    assert StorybookService._image_extension(b"\xff\xd8\xff" + b"x" * 20) == "jpg"
+    assert StorybookService._image_extension(b"RIFFxxxxWEBP" + b"x" * 20) == "webp"
+    with pytest.raises(StorybookGenerationError):
+        StorybookService._image_extension(b"<svg>untrusted</svg>")
+    path = tmp_path / "profile.json"
+    path.write_text(
+        json.dumps(
+            {
+                "env": {
+                    "OPENAI_BASE_URL": "https://openrouter.ai/api",
+                    "OPENAI_API_KEY": "test-only",
+                }
+            }
+        )
+    )
+    assert StorybookService._load_profile(path)["base_url"] == "https://openrouter.ai/api/v1"
+
+
+def test_jpeg_image_is_saved_and_served_without_png_assumption(
+    tmp_path: Path, repository_root: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import base64
+    import io
+    import urllib.request
+
+    service = StorybookService(repository_root, tmp_path)
+    monkeypatch.setattr(
+        service,
+        "_load_profile",
+        lambda _: {
+            "base_url": "https://openrouter.ai/api/v1",
+            "token": "test-only",
+        },
+    )
+    image = b"\xff\xd8\xff" + b"x" * 20
+    monkeypatch.setattr(
+        urllib.request,
+        "urlopen",
+        lambda *a, **kw: io.BytesIO(
+            json.dumps({"data": [{"b64_json": base64.b64encode(image).decode()}]}).encode()
+        ),
+    )
+    service._generate_image("test-story", 1, outline()[0])
+    assert (service.storage_root / "test-story/page-01.jpg").read_bytes() == image
+
+
+def test_story_failure_keeps_http_status_without_secret() -> None:
+    import urllib.error
+
+    error = urllib.error.HTTPError("https://secret.example", 401, "secret", {}, None)
+    assert StorybookService._failure(error) == {"error": "HTTPError", "httpStatus": 401}

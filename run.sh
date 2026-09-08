@@ -31,7 +31,8 @@ trap 'echo "ERROR: stage=${stage} line=${LINENO} exit=$?" >&2' ERR
 
 echo "=== Starting JAITRA Play ==="
 echo "Started: $(date -u +%FT%TZ)"
-echo "Commit: $(git rev-parse --short HEAD 2>/dev/null || echo unknown)"
+export JAITRA_RUN_LOG_DIR="${run_dir}"
+echo "Commit: $(git -c safe.directory="${repository_root}" rev-parse --short HEAD 2>/dev/null || echo unknown)"
 echo "Logs: ${run_dir}"
 
 for command in uv npm curl; do

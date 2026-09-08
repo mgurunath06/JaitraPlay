@@ -1,7 +1,10 @@
 import json
 import logging
+from contextvars import ContextVar
 from datetime import UTC, datetime
 from typing import Any
+
+request_id: ContextVar[str] = ContextVar("request_id", default="none")
 
 
 def configure_logging(level: str) -> None:
@@ -18,6 +21,7 @@ def log_event(
     payload: dict[str, Any] | None = None,
 ) -> None:
     record = {
+        "requestId": request_id.get(),
         "ts": datetime.now(UTC).isoformat(),
         "level": logging.getLevelName(level),
         "component": component,

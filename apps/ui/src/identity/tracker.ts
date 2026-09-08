@@ -1,4 +1,4 @@
-import type { Landmark } from "../camera/observe";
+import { handRaised, type Landmark } from "../camera/observe";
 import type { Face } from "./faces";
 import type { IdentityProfile } from "./types";
 export interface Person { id: number; pose: Landmark[]; face?: Face; x: number; y: number; raised: boolean; raisedSince: number; lowered: boolean; matches: number }
@@ -32,7 +32,7 @@ export class PersonTracker {
     const next = candidates.map((p, i): Person => {
       const linked = links[i];
       const old = linked.length === 1 && links.filter(v => v.some(item => item.id === linked[0].id)).length === 1 ? linked[0] : undefined;
-      const raised = [15, 16].some((w, j) => visible(p.pose[w]) && p.pose[w].y < p.pose[11 + j].y - 0.08);
+      const raised = [15, 16].some((w, j) => handRaised(p.pose, w, 11 + j));
       const found = associatedFaces[i];
       const face = found.length === 1 && associatedFaces.filter(v => v.includes(found[0])).length === 1 ? found[0] : undefined;
       const matches = face && profile && faceMatches(face, profile) ? (old?.matches ?? 0) + 1 : 0;

@@ -55,3 +55,23 @@ it("releases capture on abort without requiring a stop", async () => {
   expect(device.trackStop).toHaveBeenCalledOnce();
   expect(device.port.onmessage).toBeNull();
 });
+
+it("boosts quiet speech without boosting silence or clipping peaks", async () => {
+  const { captureGain, encodePcm } = await import("./record");
+  expect(captureGain(.004, .02)).toBe(8);
+  expect(captureGain(0, 0)).toBe(1);
+  expect(captureGain(.002, .8)).toBeCloseTo(1.125);
+  const bytes = atob(encodePcm([new Float32Array([.02])], 1, 8));
+  expect(new DataView(Uint8Array.from(bytes, c => c.charCodeAt(0)).buffer).getInt16(0, true)).toBeGreaterThan(5000);
+});
+
+it("does not silently switch away from a missing saved microphone", async () => {
+  const { readSettings, saveSettings } = await import("../setup/settings");
+  saveSettings({ ...readSettings(), microphoneId: "missing-device" });
+  const getUserMedia = vi.fn().mockRejectedValue(new DOMException("gone", "NotFoundError"));
+  vi.stubGlobal("navigator", { mediaDevices: { getUserMedia } });
+  try {
+    await expect(recordVoice(new AbortController().signal)).rejects.toThrow("saved microphone is disconnected");
+    expect(getUserMedia).toHaveBeenCalledOnce();
+  } finally { localStorage.clear(); }
+});

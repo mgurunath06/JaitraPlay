@@ -52,8 +52,9 @@ export function App() {
       else { setClosed(true); setConfirmExit(false); }
     } catch { setExitError(true); }
   };
-  if (closed) return <main className="stage"><section className="panel"><h1>See you next time!</h1><p>You can close this browser tab.</p><button className="primary" onClick={() => setClosed(false)}>Play again</button></section></main>;
+  if (closed) return <><img className="persistent-brand" src={jaitraLabsLogo} alt="Jaitra Labs" /><main className="stage"><section className="panel"><h1>See you next time!</h1><p>You can close this browser tab.</p><button className="primary" onClick={() => setClosed(false)}>Play again</button></section></main></>;
   return <>
+    <img className={`persistent-brand ${playing ? "persistent-brand-playing" : ""}`} src={jaitraLabsLogo} alt="Jaitra Labs" />
     {!playing && <nav className="app-controls" aria-label="App controls" inert={setupOpen || confirmExit || undefined}>
       <button onClick={() => { setCameraView(false); setSetupOpen(true); }}>Setup</button>
       <button onClick={() => setCameraView(value => !value)}>{cameraView ? "Hide camera view" : "Camera view"}</button>
@@ -81,7 +82,7 @@ export function App() {
       </section>
     </div>}
     {splashVisible && <div className="brand-splash">
-      <img src={jaitraLabsLogo} alt="Jaitra Labs" />
+      <img src={jaitraLabsLogo} alt="" />
     </div>}
   </>;
 }

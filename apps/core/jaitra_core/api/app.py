@@ -1,10 +1,14 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import AsyncIterator
+import logging
+import re
+import time
+from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
+from uuid import uuid4
 
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, Request, Response, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, JSONResponse
 
 from jaitra_core.api.models import (
@@ -15,6 +19,7 @@ from jaitra_core.api.models import (
     TranscriptionRequest,
 )
 from jaitra_core.identity import IdentityProfile
+from jaitra_core.observability.logging import log_event, request_id
 from jaitra_core.providers import QuestionGenerationError, StorybookNotFound
 from jaitra_core.runtime import CoreRuntime
 from jaitra_core.voice import VoiceUnavailable
@@ -31,6 +36,36 @@ def create_app(runtime: CoreRuntime, *, manage_lifecycle: bool = True) -> FastAP
             runtime.stop()
 
     app = FastAPI(title="JAITRA Core", version="1.0", lifespan=lifespan)
+
+    @app.middleware("http")
+    async def trace_request(
+        request: Request, call_next: Callable[[Request], Awaitable[Response]]
+    ) -> Response:
+        supplied = request.headers.get("x-request-id", "")
+        trace = supplied if re.fullmatch(r"[a-f0-9-]{36}", supplied) else str(uuid4())
+        token = request_id.set(trace)
+        started = time.monotonic()
+        status = 500
+        try:
+            response = await call_next(request)
+            status = response.status_code
+            response.headers["X-Request-ID"] = trace
+            return response
+        finally:
+            route = getattr(request.scope.get("route"), "path", "unknown")
+            log_event(
+                logging.getLogger(__name__),
+                logging.INFO,
+                "API_REQUEST",
+                "api",
+                payload={
+                    "route": route,
+                    "method": request.method,
+                    "status": status,
+                    "durationMs": round((time.monotonic() - started) * 1000),
+                },
+            )
+            request_id.reset(token)
 
     @app.get("/api/v1/identity/jaitra")
     async def get_identity() -> IdentityProfile | None:
@@ -93,16 +128,11 @@ def create_app(runtime: CoreRuntime, *, manage_lifecycle: bool = True) -> FastAP
             story = runtime.start_storybook(request.topic)
         except ValueError:
             raise HTTPException(status_code=422, detail="TOPIC_NOT_ALLOWED") from None
-        return JSONResponse(
-            story.model_dump(mode="json", by_alias=True), status_code=202
-        )
+        return JSONResponse(story.model_dump(mode="json", by_alias=True), status_code=202)
 
     @app.get("/api/v1/storybooks")
     async def storybook_library() -> list[dict[str, object]]:
-        return [
-            book.model_dump(mode="json", by_alias=True)
-            for book in runtime.storybook_library()
-        ]
+        return [book.model_dump(mode="json", by_alias=True) for book in runtime.storybook_library()]
 
     @app.get("/api/v1/storybooks/{story_id}")
     async def storybook(story_id: str) -> JSONResponse:
@@ -118,7 +148,7 @@ def create_app(runtime: CoreRuntime, *, manage_lifecycle: bool = True) -> FastAP
             path = runtime.storybooks.image_path(story_id, page_number)
         except StorybookNotFound:
             raise HTTPException(status_code=404, detail="STORY_IMAGE_NOT_FOUND") from None
-        return FileResponse(path, media_type="image/png", headers={"Cache-Control": "private"})
+        return FileResponse(path, headers={"Cache-Control": "private"})
 
     @app.post("/api/v1/commands")
     async def commands(command: CommandEnvelope) -> JSONResponse:
