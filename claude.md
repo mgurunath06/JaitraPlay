@@ -72,28 +72,30 @@ shown after the update; do not equate successful build output with a verified Gi
 commit. Updated core/UI startup, microphone/camera trials, saved recognition, and
 reboot behavior have **not yet been confirmed**.
 
-## Existing launchers and pending correction
+## Repository launcher and Ubuntu transition
 
-`/opt/jaitraplay/run.sh` and `/opt/jaitraplay/run-jaitra.sh` are existing executable,
-local/untracked launchers owned by `remoteadmin:jaitra`. They are not available in
-this development checkout. Earlier handoff describes them as follows:
+`run.sh` is now tracked in the repository, based on the owner's existing Ubuntu
+launcher. It resolves the checkout from its own location, adds the runtime user's
+`.local/bin` to PATH, checks dependencies, preserves existing config, builds the
+UI, starts `deploy/scripts/run-core.sh` (which preserves `--extra voice`), waits
+for snapshot readiness with bounded requests, and launches installed production
+Electron with both development environment overrides cleared. It stops its core
+process on exit and fails if the core exits or readiness times out. No NVM is
+required. Shell syntax was checked locally; graphical Ubuntu execution remains
+unverified. Run as `admin2` in the Ubuntu desktop session.
 
-- `run-jaitra.sh`: checks dependencies, runs `uv sync --dev`, installs npm packages
-  if Electron is missing, builds, starts core, waits for API, launches production
-  Electron, and cleans up core on exit.
-- `run.sh`: adds `~/.local/bin` to PATH, starts core, waits, builds, launches
-  production Electron, and cleans up core on exit.
-- Both invoke `uv` without `--extra voice`; this can remove optional Vosk support.
-- Owner explicitly requested updating existing `run.sh`. **This has not been done.**
-- Owner subsequently supplied `run.sh`: it invokes `uv run jaitra-core`, polls
-  snapshot 40 times at 250 ms intervals, builds with `npm run build`, and launches
-  `npx electron .` with `ELECTRON_RUN_AS_NODE` cleared. Its EXIT/INT/TERM trap kills
-  the core. The polling loop does not fail explicitly on readiness timeout.
-- Next pending step: back up and edit the Ubuntu script to use
-  `uv run --extra voice jaitra-core` and also clear `JAITRA_UI_DEV_URL` for Electron.
-  This correction has been proposed but not confirmed executed. Provide one step
-  at a time, verify shell syntax and actual changes afterward, and preserve the
-  working desktop launch method. No NVM dependency is needed.
+**Ubuntu transition is pending:** `/opt/jaitraplay/run.sh` was previously local
+and untracked. Back it up/move it outside the checkout before pulling this new
+tracked file, otherwise Git may refuse to overwrite it. Preserve the backup until
+the repository launcher has been tested. Give the owner one step at a time.
+
+`run-jaitra.sh` remains a separate local/untracked Ubuntu launcher, owned by
+`remoteadmin:jaitra`; it is not available in this development checkout. Earlier
+handoff says it checks dependencies, runs `uv sync --dev`, builds, starts core,
+waits for API, launches production Electron, and cleans up core on exit. Its
+missing voice extra has not been corrected; prefer the tracked `run.sh` after
+updating. The earlier proposed sed change to the appliance's local `run.sh` was
+not confirmed executed before the owner requested a tracked replacement.
 
 Do not substitute `deploy/scripts/run-ui.sh`: it starts development Electron and
 expects a separate Vite server. App autostart, desktop shortcuts, and `admin2`
