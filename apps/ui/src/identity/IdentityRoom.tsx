@@ -6,10 +6,15 @@ import { identityRequest } from "./client";
 import { PersonTracker, distance, type Person } from "./tracker";
 import type { IdentityProfile } from "./types";
 
+import { ExperimentLog, measuredFaces } from "./experiment";
+import { ExperimentPanel } from "./ExperimentPanel";
+import type { FaceObservation } from "./faces";
+
 type Phase = "idle" | "choose" | "confirm" | "capture" | "review";
 const prompts = ["Look towards the camera", "Keep looking towards the camera", "Turn your face slightly left", "Hold that gentle left turn", "Turn your face slightly right", "Hold that gentle right turn"];
 export function IdentityRoom({ open, paused, quiet, onClose }: { open: boolean; paused: boolean; quiet: boolean; onClose: () => void }) {
   const video = useRef<HTMLVideoElement>(null);
+  const experiment = useRef(new ExperimentLog());
   const tracker = useRef(new PersonTracker());
   const profile = useRef<IdentityProfile | null>(null);
   const [saved, setSaved] = useState(false);
@@ -62,6 +67,8 @@ export function IdentityRoom({ open, paused, quiet, onClose }: { open: boolean; 
     let worker: Worker | undefined;
     let timer: number | undefined;
     let watchdog: number | undefined;
+    let frameStarted = 0;
+    let frameTimestamp = "";
     let lastVideoTime = -1;
     let lastFrameAt = performance.now();
     const canvas = document.createElement("canvas"); canvas.width = 640; canvas.height = 480;
@@ -72,6 +79,7 @@ export function IdentityRoom({ open, paused, quiet, onClose }: { open: boolean; 
     };
     const fail = () => {
       if (!active) return;
+      experiment.current.add({ type: "error", timestamp: new Date().toISOString(), decision: "recognition_stopped" });
       active = false; cleanup(); tracker.current.reset(); setPeople([]); setSelected(null); setRunning(false);
       setError("Recognition stopped. Check camera access and installed models, then pause and resume recognition.");
       window.dispatchEvent(new CustomEvent("jaitra:participant", { detail: null }));
@@ -102,6 +110,7 @@ export function IdentityRoom({ open, paused, quiet, onClose }: { open: boolean; 
               timer = window.setTimeout(() => void send(), 200); return;
             }
             lastVideoTime = element.currentTime; lastFrameAt = performance.now();
+            frameStarted = performance.now(); frameTimestamp = new Date().toISOString();
             ctx.drawImage(element, 0, 0, canvas.width, canvas.height);
             const frame = await createImageBitmap(canvas);
             if (!active) { frame.close(); return; }
@@ -117,7 +126,10 @@ export function IdentityRoom({ open, paused, quiet, onClose }: { open: boolean; 
           if (data.type !== "result") return;
           try {
             // Both detectors see the same captured frame; only one frame is in flight.
-            const found = await faces.detectFaces(canvas);
+            const faceStarted = performance.now();
+            let observations: FaceObservation[] = [];
+            const found = await faces.detectFaces(canvas, experiment.current.active ? values => { observations = values; } : undefined);
+            const faceLatencyMs = performance.now() - faceStarted;
             if (!active) return;
             const now = performance.now();
             const engine = tracker.current;
@@ -148,6 +160,13 @@ export function IdentityRoom({ open, paused, quiet, onClose }: { open: boolean; 
               setSelected(engine.target);
               window.dispatchEvent(new CustomEvent("jaitra:participant", { detail: target ? { name: "Jaitra", trackId: target.id, source: engine.source, pose: target.pose, time: now } : null }));
             }
+            if (experiment.current.active) experiment.current.add({ type: "frame", timestamp: frameTimestamp, videoTime: lastVideoTime,
+              sourceWidth: element.videoWidth, sourceHeight: element.videoHeight, analysisWidth: canvas.width, analysisHeight: canvas.height,
+              latencyMs: performance.now() - frameStarted, faceLatencyMs, phase: phaseRef.current,
+              faces: measuredFaces(observations, profile.current),
+              people: current.map(p => ({ trackId: p.id, hasFace: !!p.face, matches: p.matches })),
+              decision: engine.target === null ? "uncertain" : engine.source === "gesture" ? "gesture_selected" : "face_track_selected",
+              target: engine.target, source: engine.source });
             timer = window.setTimeout(() => void send(), 200);
           } catch { fail(); }
         };
@@ -199,7 +218,7 @@ export function IdentityRoom({ open, paused, quiet, onClose }: { open: boolean; 
     {!open && running && selected === null && saved && <p className="identity-prompt" aria-live="polite">{message}</p>}
     <div hidden={!open}>
       <header><h2>Remember Jaitra</h2><button onClick={onClose}>Close</button></header>
-      <p>Mimo remembers Jaitra on this device after app restarts. No photos or video are saved. Recognition runs while the app is visible and pauses for other camera views.</p>
+      <p>Mimo remembers Jaitra on this device after app restarts. Normal recognition saves no photos or video. The optional camera experiment saves clips only when you start recording. Recognition runs while the app is visible and pauses for other camera views.</p>
       <button disabled={!loaded || busy} onClick={() => { setEnabled(v => !v); setError(""); }}>{enabled ? "Pause recognition" : "Start recognition"}</button>
       <div className="identity-preview">
         <video ref={video} muted playsInline aria-label="Jaitra enrollment camera" />
@@ -214,6 +233,7 @@ export function IdentityRoom({ open, paused, quiet, onClose }: { open: boolean; 
       {phase !== "idle" && <button disabled={busy} onClick={() => { samples.current = []; candidate.current = null; changePhase("idle"); }}>Cancel enrollment</button>}
       {saved && phase === "idle" && <button disabled={busy} onClick={() => setDeleteConfirm(true)}>Forget Jaitra</button>}
       {deleteConfirm && <div><p>Delete Jaitra’s saved recognition profile from this device?</p><button disabled={busy} onClick={() => void forget()}>Yes, delete profile</button><button disabled={busy} onClick={() => setDeleteConfirm(false)}>Keep profile</button></div>}
+      <ExperimentPanel video={video} log={experiment.current} profile={profile} />
       <p>A back-only view may need a hand-raise confirmation. The saved profile is never changed by that confirmation.</p>
     </div>
   </section>;

@@ -1,0 +1,154 @@
+{
+  "clips": [
+    {
+      "id": "enrollment-example",
+      "path": "enrollment-example.webm",
+      "session": "enrollment-session",
+      "split": "enrollment",
+      "frames": [
+        {
+          "time": 0,
+          "faces": [
+            {
+              "label": "jaitra",
+              "box": {
+                "x": 0.4,
+                "y": 0.2,
+                "width": 0.15,
+                "height": 0.2
+              }
+            }
+          ]
+        },
+        {
+          "time": 1,
+          "faces": [
+            {
+              "label": "jaitra",
+              "box": {
+                "x": 0.4,
+                "y": 0.2,
+                "width": 0.15,
+                "height": 0.2
+              }
+            }
+          ]
+        },
+        {
+          "time": 2,
+          "faces": [
+            {
+              "label": "jaitra",
+              "box": {
+                "x": 0.4,
+                "y": 0.2,
+                "width": 0.15,
+                "height": 0.2
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "calibration-example",
+      "path": "calibration-example.webm",
+      "session": "calibration-session",
+      "split": "calibration",
+      "frames": [
+        {
+          "time": 0,
+          "faces": [
+            {
+              "label": "jaitra",
+              "box": {
+                "x": 0.4,
+                "y": 0.2,
+                "width": 0.15,
+                "height": 0.2
+              }
+            }
+          ]
+        },
+        {
+          "time": 1,
+          "faces": [
+            {
+              "label": "jaitra",
+              "box": {
+                "x": 0.4,
+                "y": 0.2,
+                "width": 0.15,
+                "height": 0.2
+              }
+            }
+          ]
+        },
+        {
+          "time": 2,
+          "faces": [
+            {
+              "label": "jaitra",
+              "box": {
+                "x": 0.4,
+                "y": 0.2,
+                "width": 0.15,
+                "height": 0.2
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "test-example",
+      "path": "test-example.webm",
+      "session": "test-session",
+      "split": "test",
+      "frames": [
+        {
+          "time": 0,
+          "faces": [
+            {
+              "label": "jaitra",
+              "box": {
+                "x": 0.4,
+                "y": 0.2,
+                "width": 0.15,
+                "height": 0.2
+              }
+            }
+          ]
+        },
+        {
+          "time": 1,
+          "faces": [
+            {
+              "label": "jaitra",
+              "box": {
+                "x": 0.4,
+                "y": 0.2,
+                "width": 0.15,
+                "height": 0.2
+              }
+            }
+          ]
+        },
+        {
+          "time": 2,
+          "faces": [
+            {
+              "label": "jaitra",
+              "box": {
+                "x": 0.4,
+                "y": 0.2,
+                "width": 0.15,
+                "height": 0.2
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

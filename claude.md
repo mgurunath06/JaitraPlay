@@ -1,6 +1,6 @@
 # Ubuntu deployment handoff
 
-Last updated: September 8, 2026. This record combines the earlier verified
+Last updated: September 9, 2026. This record combines the earlier verified
 deployment handoff with command output supplied by the owner in this conversation.
 It is not evidence of a new remote inspection. See also `README.md` and `cloud.md`
 for application behavior and general setup.
@@ -235,3 +235,167 @@ storybook provider failure still require a physical retry with the new diagnosti
 Next deployment: fast-forward pull as `remoteadmin`, then run `./run.sh` from
 `admin2`'s graphical desktop. No dependency changes require `npm ci` for this update.
 If failures remain, use the report command above before proposing further fixes.
+
+## Face and body recognition strategy — agreed September 9
+
+The current recognition behavior is a baseline to measure, not the target design.
+Do not replace it, tune its threshold, enlarge its detector, change camera geometry,
+or build the final enrollment wizard until the baseline evaluation below exists.
+The earlier proposed 24-view guided-enrollment implementation was set aside under
+the Git-ignored `.local/identity-drafts/`; it is not part of the application.
+
+### Product and identity rules
+
+- Use computer vision locally. OpenRouter and other language-model services have
+  no role in face detection, embeddings, matching, pose estimation, or tracking.
+- Face is the identity evidence. Body pose follows an already face-confirmed child
+  and supports gestures, position, and continuity. Clothing, body shape, or height
+  must never independently confirm identity. Height may only reject implausible
+  candidates or prioritize work.
+- Show three distinct states in the eventual product: **face confirmed**,
+  **following a previously confirmed track**, and **identity uncertain**. Do not
+  present hand-raise selection as facial recognition.
+- Never silently learn from a live or uncertain match. Parent confirmation is
+  required for enrollment and any later gallery update.
+- Store embeddings and calibration locally. Normal recognition saves no frames.
+  Evaluation recording is explicit and opt-in; its raw videos contain sensitive
+  biometric data and stay in the Git-ignored `.local/face-eval/` directory.
+- Jaitra is four years old, so plan for appearance drift. Re-enrollment must be
+  triggered by measured degradation in held-out checks or similarity distributions,
+  not a guessed calendar interval. A short periodic recognition check can reveal
+  drift; parent-approved targeted enrollment can then repair missing conditions.
+
+### Model architecture
+
+- Preserve the current `@vladmandic/face-api` detector, 128-value descriptor,
+  640-pixel analysis width, CPU backend, and current mean-of-top-three Euclidean
+  threshold as the browser baseline.
+- Benchmark InsightFace `buffalo_l`: SCRFD detection plus ArcFace R50 512-value
+  embeddings, L2 normalization, and cosine similarity. It is allowed for this
+  family build. Run it locally through ONNX Runtime GPU on the Ubuntu appliance.
+- Keep the candidate embedder behind a thin interface solely so the benchmark can
+  swap model packs without rewriting clip loading, gallery construction, scoring,
+  or reports. This is an evaluation boundary, not a licensing abstraction.
+- Keep detection, embedding, gallery scoring, and track aggregation distinct.
+  Report which complete pipeline is tested. A stronger embedder cannot recover a
+  face that was never detected or image detail discarded before inference.
+- The primary gallery comes from curated frames recorded by the deployment camera
+  in the actual room. Score against retained normalized embeddings; the current
+  ArcFace experiment uses maximum cosine similarity. Compare this deliberately
+  with centroid or other aggregation only if the labelled evaluation justifies it.
+- Historical parent-confirmed photos may form a separately named secondary-gallery
+  experiment. Never mix them silently into the primary gallery or held-out test.
+
+### Required order of work
+
+1. **Instrument the unchanged build.** Opt-in logging records each processed
+   timestamp, source/analysis dimensions, every detected face box in pixels,
+   detector confidence, variance of Laplacian, mean crop luminance, nearest and
+   mean-top-three Euclidean distances, match decision, tracker decision, and
+   detector/total latency. Empty detections and pipeline errors must remain visible.
+   Descriptors and images must not enter the JSONL log.
+2. **Observe real failures.** Reproduce the existing problem before interpreting
+   it. A missing or very small face suggests geometry/detection/occlusion; a clean
+   face with persistently weak similarity suggests alignment, gallery mismatch, or
+   embedder limitations; a strong wrong-person score suggests gallery/threshold or
+   association failure. These signatures may coexist and are diagnoses to test,
+   not automatic conclusions.
+3. **Build a labelled evaluation set.** Record 15–20 clips of 20–30 seconds:
+   entering, floor play, sitting, turning away, walking across the frame, near and
+   far, daylight and evening light, parent alone, parent and child together, and a
+   consenting visitor if available. Label all visible faces, including misses.
+   Explicitly label no-face frames. Split by independent capture session into
+   enrollment, calibration, and test. Never split adjacent frames across sets.
+4. **Benchmark the two complete pipelines.** Use the same labelled clips and the
+   same 640-pixel analysis width first. Build each gallery only from enrollment
+   sessions. Compare face-api and buffalo_l by ground-truth source face width:
+   `<40`, `40–60`, `60–90`, `90–130`, and `130+` pixels. Report detection recall,
+   child misses, false accepts, unmatched accepted detections, gallery size, and
+   latency. Raw correlated frame counts are not independent accuracy trials.
+5. **Run resolution and geometry experiments.** After the equal-input comparison,
+   evaluate source-resolution processing separately. Use results to choose capture
+   resolution, analysis width, camera position, and the part of the room where
+   recognition is supported. Prefer placement near the child's usual eye height
+   when the measurements show steep pitch or distance is damaging results.
+6. **Calibrate on calibration sessions only.** Sweep thresholds using higher-is-
+   better scores: negative Euclidean for face-api and cosine for ArcFace. The cost
+   of incorrectly identifying someone as Jaitra must determine the operating point;
+   the small family dataset cannot prove a population-scale false-accept rate.
+   Freeze the selected pipeline and threshold before opening the test results.
+7. **Add time-spread track evidence.** Track multiple people with stable application
+   track IDs, associate each detected face to one body/track, and refresh identity
+   only from confident face evidence. Aggregate embeddings or use a k-of-n vote
+   sampled hundreds of milliseconds apart across the track, with hysteresis. Three
+   adjacent processed frames are too correlated to count as independent evidence.
+   Crossings, disappearance, re-entry, and ambiguous face/body associations must
+   return to uncertain rather than transfer identity.
+8. **Build the setup experience around the proven pipeline.** The child-facing
+   procedure should be short and playful: record 60–90 seconds of normal play,
+   automatically propose sharp, well-lit, diverse views from actual operating
+   distances, and ask the parent to confirm them. Use small guided prompts only to
+   fill missing left/right, pitch, expression, distance, or lighting coverage.
+   Reject blur, clipping, unusably small faces, poor exposure, near duplicates, and
+   samples inconsistent with the confirmed child. More samples are not inherently
+   better; roughly 12–15 diverse retained embeddings are an initial hypothesis to
+   validate rather than a fixed quota.
+9. **Calibrate body behavior separately.** Observe normal sitting, standing,
+   walking, and hand movements; check which landmarks and room areas are actually
+   visible. MediaPipe Pose Landmarker is configured for up to four poses, but its
+   result order is not persistent identity. Evaluate our association and track IDs
+   explicitly when adults and the child overlap or cross. Consider a person detector
+   and dedicated multi-person tracker only if measured failures require it.
+10. **Run held-out acceptance.** Test entry/re-entry, sitting and standing, gentle
+    turns, close/far positions, lighting, parent alone, multiple people, crossings,
+    and temporary face loss. Report condition-level passes, misses, false accepts,
+    recognition delay, and identity switches. Save the new live pipeline only after
+    these held-out results and the operating tradeoff are reviewed.
+
+The working instrumentation, recorder, local labelling page, baseline replay,
+InsightFace runner, CUDA checks, scorer, limitations, and commands are documented
+in `deploy/face_eval/README.md`. That file is the operational authority for the
+evaluation format; this section is the strategy and sequencing authority.
+
+### CUDA and Ubuntu status
+
+On September 9, remote inspection confirmed the RTX 3050 and driver 595.84. The
+existing application `.venv` had no ONNX Runtime or InsightFace. A separate
+`/opt/jaitraplay/.local/face-eval-venv` was created with Python 3.12.14,
+ONNX Runtime GPU 1.23.2, packaged CUDA 12 runtime libraries, cuDNN 9, and
+InsightFace 0.7.3. ONNX profiling confirmed an actual CUDA matrix-multiplication
+kernel. buffalo_l SCRFD completed detector inference and ArcFace returned a finite
+1×512 embedding; both sessions selected `CUDAExecutionProvider`. These are
+installation smoke tests only. No child image or camera clip was used, so accuracy
+and steady-state latency are still unknown. Do not describe CUDA capability alone
+as recognition acceptance.
+
+The evaluation environment is deliberately separate from the core `.venv`; do not
+add InsightFace or GPU libraries to the live core until the benchmark selects that
+pipeline. The current live browser pose GPU option is WebGL, not CUDA.
+
+### Deployment required for this evaluation increment
+
+The application update consists of the modified identity UI/detector files, new
+`apps/ui/src/identity` experiment modules, `deploy/face_eval`, the CUDA setup
+script, tests, and documentation. It adds no npm runtime package, changes no core
+schema, and requires no database migration. After the changes are committed and
+pushed, update `/opt/jaitraplay` with a normal fast-forward pull as `remoteadmin`.
+Then launch `./run.sh` from `admin2`'s graphical desktop; its normal build includes
+the new instrumentation UI. `npm ci` is not required unless `node_modules` is
+missing or the lockfile changed. If `npm ci` is run, recheck Electron's
+`chrome-sandbox` ownership/mode because npm may replace it.
+
+The isolated CUDA evaluation environment is already installed and smoke-tested on
+this appliance. Its current files are owned by `remoteadmin:jaitra` with group-write
+permissions, so `admin2` can reuse them. After the repository update, run the
+checked-in verification once as `admin2` so the environment is reproducible from
+repository sources:
+
+```bash
+cd /opt/jaitraplay
+JAITRA_EVAL_UV=/home/admin2/.local/bin/uv bash deploy/scripts/setup-face-eval.sh
+```
+
+This downloads large pinned CUDA/cuDNN/ONNX packages and buffalo_l only when absent;
+it does not alter the NVIDIA driver. Do not run it on each app launch. Evaluation
+clips and manifests are local data and are never deployed through Git; collect them
+on Ubuntu into `/opt/jaitraplay/.local/face-eval/` after the updated UI is running.

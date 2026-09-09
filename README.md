@@ -360,3 +360,7 @@ Storybook accepts PNG, JPEG, and WebP output and serves the matching MIME type.
 This follows the [OpenRouter image response documentation](https://openrouter.ai/docs/guides/overview/multimodal/image-generation),
 which permits multiple output formats. Provider failures now log stage, HTTP
 status and story/page references without prompts or response bodies.
+
+## Face recognition baseline experiments
+
+Use **Remember Jaitra → Camera experiment** for opt-in frame diagnostics and local evaluation clips. The live model and matching rules remain the baseline. The [evaluation procedure](deploy/face_eval/README.md) covers clip labelling, session-separated face-api/buffalo_l comparisons, face-size tables, and CUDA setup on Ubuntu. Record real failures before changing geometry, thresholds, or enrollment.
