@@ -33,6 +33,24 @@ describe("persistent identity matching and session tracking", () => {
     t.update([pose()], [], 600, null); t.select(t.people[0].id);
     t.update([pose()], [], 4000, null); expect(t.target).toBeNull();
   });
+  it("keeps the same track number through short pose and face dropouts", () => {
+    const t = new PersonTracker();
+    t.update([pose()], [face()], 0, null);
+    const id = t.people[0].id;
+    t.update([], [], 500, null); expect(t.people).toHaveLength(0);
+    t.update([pose()], [face()], 1000, null); expect(t.people[0].id).toBe(id);
+    t.update([], [face()], 1400, null); expect(t.people[0].id).toBe(id);
+    expect(t.people[0].pose).toHaveLength(0);
+    t.update([pose()], [face()], 1800, null); expect(t.people[0].id).toBe(id);
+  });
+  it("creates a new track after the retention window expires", () => {
+    const t = new PersonTracker();
+    t.update([pose()], [face()], 0, null);
+    const id = t.people[0].id;
+    t.update([], [], 1000, null);
+    t.update([pose()], [face()], 2500, null);
+    expect(t.people[0].id).not.toBe(id);
+  });
   it("keeps a clear continuous track without a face, but rejects a conflicting face", () => {
     const t = new PersonTracker();
     for (const time of [0, 200, 400]) t.update([pose()], [face()], time, profile);

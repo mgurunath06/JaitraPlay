@@ -262,6 +262,11 @@ the Git-ignored `.local/identity-drafts/`; it is not part of the application.
   overlay and diagnostic log, clear them when the camera restarts, and require
   reassignment after a track-number change. They must not override automatic face
   decisions, persist as identity profiles, or count as recognition success.
+- The instrumented baseline retains recent tracks for up to 2.4 seconds and can
+  associate a face-only observation when pose loses the shoulders. This is a
+  narrow fix for stationary-person renumbering and brief detector gaps. It is not
+  the final time-spread identity tracker, and ambiguous crossings must still create
+  uncertainty rather than transfer a label.
 - Store embeddings and calibration locally. Normal recognition saves no frames.
   Evaluation recording is explicit and opt-in; its raw videos contain sensitive
   biometric data and stay in the Git-ignored `.local/face-eval/` directory.
