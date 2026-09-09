@@ -11,6 +11,8 @@ import { ExperimentPanel } from "./ExperimentPanel";
 import type { FaceObservation } from "./faces";
 
 type Phase = "idle" | "choose" | "confirm" | "capture" | "review";
+type PersonLabel = "Jaitra" | "Father" | "Mother" | "Other";
+const personLabelOptions: PersonLabel[] = ["Jaitra", "Father", "Mother", "Other"];
 const prompts = ["Look towards the camera", "Keep looking towards the camera", "Turn your face slightly left", "Hold that gentle left turn", "Turn your face slightly right", "Hold that gentle right turn"];
 export function IdentityRoom({ open, paused, quiet, onClose }: { open: boolean; paused: boolean; quiet: boolean; onClose: () => void }) {
   const video = useRef<HTMLVideoElement>(null);
@@ -26,6 +28,8 @@ export function IdentityRoom({ open, paused, quiet, onClose }: { open: boolean; 
   const [error, setError] = useState("");
   const [message, setMessage] = useState("Loading Jaitra’s profile…");
   const [people, setPeople] = useState<Person[]>([]);
+  const [personLabels, setPersonLabels] = useState<Record<number, PersonLabel>>({});
+  const personLabelsRef = useRef<Record<number, PersonLabel>>({});
   const [selected, setSelected] = useState<number | null>(null);
   const [phase, setPhase] = useState<Phase>("idle");
   const phaseRef = useRef<Phase>("idle");
@@ -59,6 +63,7 @@ export function IdentityRoom({ open, paused, quiet, onClose }: { open: boolean; 
 
   useEffect(() => {
     tracker.current.reset(); setPeople([]); setSelected(null); setRunning(false);
+    personLabelsRef.current = {}; setPersonLabels({});
     challenge.current = false; candidate.current = null; samples.current = []; setCount(0); changePhase("idle");
     window.dispatchEvent(new CustomEvent("jaitra:participant", { detail: null }));
     if (!enabled || paused || hidden || !loaded) return;
@@ -164,7 +169,8 @@ export function IdentityRoom({ open, paused, quiet, onClose }: { open: boolean; 
               sourceWidth: element.videoWidth, sourceHeight: element.videoHeight, analysisWidth: canvas.width, analysisHeight: canvas.height,
               latencyMs: performance.now() - frameStarted, faceLatencyMs, phase: phaseRef.current,
               faces: measuredFaces(observations, profile.current),
-              people: current.map(p => ({ trackId: p.id, hasFace: !!p.face, matches: p.matches })),
+              people: current.map(p => ({ trackId: p.id, hasFace: !!p.face, matches: p.matches,
+                manualLabel: personLabelsRef.current[p.id] ?? "unlabelled" })),
               decision: engine.target === null ? "uncertain" : engine.source === "gesture" ? "gesture_selected" : "face_track_selected",
               target: engine.target, source: engine.source });
             timer = window.setTimeout(() => void send(), 200);
@@ -213,6 +219,29 @@ export function IdentityRoom({ open, paused, quiet, onClose }: { open: boolean; 
     finally { setBusy(false); }
   };
   const highlighted = phase === "idle" ? selected : candidate.current;
+  const labelPerson = (id: number, label: PersonLabel | null) => {
+    setPersonLabels(current => {
+      const next = { ...current };
+      if (label === null) delete next[id];
+      else {
+        // Named family labels identify one visible track; "Other" can label several people.
+        if (label !== "Other") {
+          for (const [trackId, assigned] of Object.entries(next)) {
+            if (assigned === label) delete next[Number(trackId)];
+          }
+        }
+        next[id] = label;
+      }
+      personLabelsRef.current = next;
+      return next;
+    });
+    experiment.current.add({ type: "manual_label", timestamp: new Date().toISOString(),
+      trackId: id, label: label ?? "unlabelled" });
+    if (label === "Jaitra" && phaseRef.current === "choose") {
+      candidate.current = id; changePhase("confirm");
+      announce("Please confirm that the selected person is Jaitra.");
+    }
+  };
   return <section className={`identity-room ${open ? "identity-open" : "identity-collapsed"}`} aria-label="Jaitra recognition">
     <div className="identity-status" aria-live="polite">{error ? "Recognition needs attention — open Remember Jaitra" : running ? selected !== null ? "Camera on · Tracking Jaitra" : "Camera on · Looking for Jaitra" : saved ? "Jaitra recognition paused" : "Jaitra is not enrolled"}</div>
     {!open && running && selected === null && saved && <p className="identity-prompt" aria-live="polite">{message}</p>}
@@ -222,8 +251,25 @@ export function IdentityRoom({ open, paused, quiet, onClose }: { open: boolean; 
       <button disabled={!loaded || busy} onClick={() => { setEnabled(v => !v); setError(""); }}>{enabled ? "Pause recognition" : "Start recognition"}</button>
       <div className="identity-preview">
         <video ref={video} muted playsInline aria-label="Jaitra enrollment camera" />
-        {people.map(p => <span key={p.id} className={highlighted === p.id ? "identity-label selected" : "identity-label"} style={{ left: `${(1 - p.x) * 100}%`, top: `${p.y * 100}%` }}>{highlighted === p.id ? phase === "idle" ? "Jaitra" : "Confirm this person" : `Person ${p.id}`}</span>)}
+        {people.map(p => {
+          const name = personLabels[p.id] ?? `Person ${p.id}`;
+          const suffix = highlighted === p.id ? phase === "idle" ? " · face match: Jaitra" : " · selected for enrollment" : "";
+          return <span key={p.id} className={highlighted === p.id ? "identity-label selected" : "identity-label"} style={{ left: `${(1 - p.x) * 100}%`, top: `${p.y * 100}%` }}>{name}{suffix}</span>;
+        })}
       </div>
+      {running && people.length > 0 && <fieldset className="identity-person-labels">
+        <legend>Who is in view?</legend>
+        <p>Choose the name shown over each person. Labels follow the current camera track and do not change face recognition or save a face profile.</p>
+        {people.map(person => <div key={person.id}>
+          <strong>{personLabels[person.id] ?? `Person ${person.id}`}</strong>
+          {personLabelOptions.map(label => <button key={label} type="button"
+            aria-label={`Label Person ${person.id} as ${label}`}
+            aria-pressed={personLabels[person.id] === label}
+            onClick={() => labelPerson(person.id, label)}>{label}</button>)}
+          {personLabels[person.id] && <button type="button" aria-label={`Clear label for Person ${person.id}`}
+            onClick={() => labelPerson(person.id, null)}>Clear</button>}
+        </div>)}
+      </fieldset>}
       <p role="status">{message}</p>
       {error && <p role="alert">{error}</p>}
       {phase === "idle" && <button disabled={!running || busy} onClick={begin}>{saved ? "Enroll Jaitra again" : "Enroll Jaitra"}</button>}

@@ -77,3 +77,13 @@ it("does not start a camera when profile loading fails", async () => {
   expect(screen.getByRole("button", { name: "Start recognition" })).toBeDisabled();
   expect(navigator.mediaDevices.getUserMedia).not.toHaveBeenCalled();
 });
+it("lets a parent label visible tracks without changing the saved profile", async () => {
+  render(<IdentityRoom open paused={false} quiet onClose={vi.fn()} />);
+  await flush();
+  fireEvent.click(screen.getByRole("button", { name: "Start recognition" })); await flush();
+  await frame();
+  fireEvent.click(screen.getByRole("button", { name: "Label Person 1 as Father" }));
+  expect(screen.getByText("Father", { selector: ".identity-label" })).toBeVisible();
+  expect(screen.getByRole("button", { name: "Label Person 1 as Father" })).toHaveAttribute("aria-pressed", "true");
+  expect(identityRequest).toHaveBeenCalledTimes(1);
+});

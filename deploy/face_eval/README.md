@@ -6,6 +6,12 @@ This measures the existing face-api path before changing recognition. Live detec
 
 Open **Remember Jaitra → Camera experiment**, start recognition, give the session an ID, and click **Start diagnostics**. Reproduce failures, then **Stop and save diagnostics**. The local JSONL contains:
 
+Before reproducing a multi-person failure, use **Who is in view?** to assign
+Jaitra, Father, Mother, or Other to each numbered live track. These annotations
+follow only the current track, reset when the camera restarts, and are written to
+the opt-in diagnostic log. They do not override the recognizer or train a profile.
+If tracking is lost or people cross and the numbers change, assign the labels again.
+
 - Capture timestamp and video time; actual source and analysis dimensions.
 - Every detected box in analysis pixels, confidence, crop luminance and variance of the four-neighbour Laplacian. Even detections rejected by the baseline's 45-pixel cutoff are logged.
 - Nearest Euclidean distance and mean of the three nearest distances (lower is better), threshold, and per-face match. No enrollment gives null scores.

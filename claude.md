@@ -257,6 +257,11 @@ the Git-ignored `.local/identity-drafts/`; it is not part of the application.
   present hand-raise selection as facial recognition.
 - Never silently learn from a live or uncertain match. Parent confirmation is
   required for enrollment and any later gallery update.
+- Let the parent assign Jaitra, Father, Mother, or Other to numbered live tracks
+  during an evaluation. These labels are session annotations: show them in the
+  overlay and diagnostic log, clear them when the camera restarts, and require
+  reassignment after a track-number change. They must not override automatic face
+  decisions, persist as identity profiles, or count as recognition success.
 - Store embeddings and calibration locally. Normal recognition saves no frames.
   Evaluation recording is explicit and opt-in; its raw videos contain sensitive
   biometric data and stay in the Git-ignored `.local/face-eval/` directory.
