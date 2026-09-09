@@ -28,7 +28,17 @@ Interpretation: small/missing detections suggest geometry, resolution, detector 
 
 ## 1. Collect and label
 
-Use **Record 30-second evaluation clip** to save video locally without audio. This records the current camera stream at its actual resolution; it deliberately does not raise resolution before baseline measurement. Downloads must be kept in a private local folder, preferably `.local/face-eval/` (ignored by Git). Raw clips are retained on disk for repeatable evaluation; live logging itself retains no video.
+Use **Record 30-second evaluation clip** to save video locally without audio. The
+identity camera requests 1920×1080 source capture and the recorder refuses to
+collect below 1280×720. Check the actual source dimensions recorded in the log;
+`ideal` camera constraints do not guarantee the requested mode. The unchanged live
+face/pose pipeline still downsamples that source to a 640-pixel analysis canvas, so
+the baseline detector and matcher operate at their previous input size. Keeping the
+high-resolution source makes the same labelled clips usable for a later native-
+resolution experiment; detail lost in a 640×480 recording cannot be recovered.
+Downloads must be kept in a private local folder, preferably `.local/face-eval/`
+(ignored by Git). Raw clips are retained on disk for repeatable evaluation; live
+logging itself retains no video.
 
 Collect 15–20 clips, 20–30 seconds each: entry, floor play, seated, turning away, walking, close/far, daylight/evening, parent alone, child and parent together, and an available consenting visitor. Use separate capture sessions for enrollment, calibration and held-out testing. All clips from one session belong to one split. Do not use frames adjacent in time as supposedly independent examples.
 
@@ -51,7 +61,7 @@ bash deploy/scripts/setup-face-eval.sh
 
 `0.4` is an explicit exploratory starting threshold, not a validated operating point. The runner processes both calibration/test clips; only inspect calibration results while selecting thresholds. It uses L2-normalized embeddings and maximum cosine similarity over the enrollment gallery. face-api retains its actual mean-top-three Euclidean rule; this comparison measures complete detector/embedder/matcher pipelines, not an isolated embedder swap. Output records the gallery size because either detector may fail to enroll some annotated views.
 
-The `Embedder` protocol keeps model changes isolated. `--model` selects an InsightFace pack. CPU is opt-in via `--cpu` for functional checks; do not compare its latency to the GPU target. Default analysis width is 640 for both paths. Later test `--analysis-width 0` as a **separate native-resolution experiment**, not a silent change to the baseline. Detector size is recorded separately. A high-resolution camera alone does not help if the analysis pipeline discards its pixels.
+The `Embedder` protocol keeps model changes isolated. `--model` selects an InsightFace pack. CPU is opt-in via `--cpu` for functional checks; do not compare its latency to the GPU target. Default analysis width is 640 for both paths, with the high-resolution source downsampled to that width for the equal-input baseline. Later test `--analysis-width 0` as a **separate native-resolution experiment**, not a silent change to the baseline. Detector size is recorded separately. A high-resolution source does not improve the live baseline while the analysis pipeline still discards its extra pixels.
 
 The CUDA setup uses a separate Python 3.12 environment and pinned ONNX Runtime/CUDA/cuDNN packages. It runs a matrix multiplication and checks ONNX profiling evidence that a CUDA kernel actually executed. The model runner also refuses a CPU-only provider fallback. The NVIDIA driver is reused, not replaced. Reference: https://onnxruntime.ai/docs/execution-providers/CUDA-ExecutionProvider.html
 

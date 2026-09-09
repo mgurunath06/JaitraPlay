@@ -18,6 +18,11 @@ export function ExperimentPanel({ video, log, profile }: {
     try {
       const stream = video.current?.srcObject;
       if (!(stream instanceof MediaStream) || !stream.getVideoTracks().some(track => track.readyState === "live")) throw new Error("Start recognition with a working camera first.");
+      const sourceWidth = video.current?.videoWidth ?? 0;
+      const sourceHeight = video.current?.videoHeight ?? 0;
+      if (sourceWidth < 1280 || sourceHeight < 720) {
+        throw new Error(`Evaluation recording needs at least 1280×720; camera supplied ${sourceWidth}×${sourceHeight}. Choose a higher-resolution camera mode before collecting clips.`);
+      }
       if (typeof MediaRecorder === "undefined") throw new Error("Video recording is unavailable in this browser.");
       const mimeType = ["video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm"].find(type => MediaRecorder.isTypeSupported(type));
       if (!mimeType) throw new Error("WebM recording is unavailable in this browser.");
@@ -32,7 +37,7 @@ export function ExperimentPanel({ video, log, profile }: {
         setMessage(`Saved ${clip}.webm. Keep all clips from this session in the same split.`);
       };
       recorder.current = capture; capture.start(1000); setRecording(true);
-      log.add({ type: "clip_start", clip, timestamp: new Date().toISOString(), videoTime: video.current?.currentTime, camera: { width: video.current?.videoWidth, height: video.current?.videoHeight } });
+      log.add({ type: "clip_start", clip, timestamp: new Date().toISOString(), videoTime: video.current?.currentTime, camera: { width: sourceWidth, height: sourceHeight } });
       timeout.current = window.setTimeout(() => { if (capture.state === "recording") capture.stop(); }, 30000);
     } catch (error) { setMessage(error instanceof Error ? error.message : "Recording failed."); }
   };

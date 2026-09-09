@@ -274,7 +274,10 @@ the Git-ignored `.local/identity-drafts/`; it is not part of the application.
 
 - Preserve the current `@vladmandic/face-api` detector, 128-value descriptor,
   640-pixel analysis width, CPU backend, and current mean-of-top-three Euclidean
-  threshold as the browser baseline.
+  threshold as the browser baseline. Request a 1920×1080 camera source and require
+  at least 1280×720 for evaluation recordings, while continuing to downsample live
+  inference to 640 pixels. This retains source detail for later resolution tests
+  without changing the baseline model input.
 - Benchmark InsightFace `buffalo_l`: SCRFD detection plus ArcFace R50 512-value
   embeddings, L2 normalization, and cosine similarity. It is allowed for this
   family build. Run it locally through ONNX Runtime GPU on the Ubuntu appliance.

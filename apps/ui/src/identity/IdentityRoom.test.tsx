@@ -46,6 +46,9 @@ it("requires adult confirmation, captures fresh views, and saves only descriptor
   await flush();
   expect(navigator.mediaDevices.getUserMedia).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole("button", { name: "Start recognition" })); await flush();
+  expect(navigator.mediaDevices.getUserMedia).toHaveBeenCalledWith(expect.objectContaining({
+    video: expect.objectContaining({ width: { ideal: 1920 }, height: { ideal: 1080 } }),
+  }));
   fireEvent.click(screen.getByRole("button", { name: "Enroll Jaitra" }));
   await frame(false); await frame(true); await frame(true, 1300);
   expect(identityRequest).toHaveBeenCalledTimes(1);

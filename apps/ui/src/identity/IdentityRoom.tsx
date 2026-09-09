@@ -94,7 +94,12 @@ export function IdentityRoom({ open, paused, quiet, onClose }: { open: boolean; 
         const faces = await import("./faces");
         await faces.loadFaces();
         if (!active) return;
-        stream = await navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 640 }, height: { ideal: 480 }, ...(deviceId ? { deviceId: { exact: deviceId } } : {}) }, audio: false });
+        // Preserve source detail for reusable evaluation clips. Live face/pose analysis
+        // still downsamples every frame to the fixed 640-pixel canvas below.
+        stream = await navigator.mediaDevices.getUserMedia({ video: {
+          width: { ideal: 1920 }, height: { ideal: 1080 },
+          ...(deviceId ? { deviceId: { exact: deviceId } } : {}),
+        }, audio: false });
         if (!active) { cleanup(); return; }
         const element = video.current;
         if (!element) throw new Error("Video unavailable");
