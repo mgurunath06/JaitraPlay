@@ -26,7 +26,7 @@ class CompanionConfig(StrictModel):
 
 
 class UiConfig(StrictModel):
-    max_hub_choices: int = Field(default=5, ge=1, le=5)
+    max_hub_choices: int = Field(default=6, ge=1, le=6)
     inactivity_seconds: int = Field(default=300, ge=30, le=3600)
     pointer_visible: bool = True
 

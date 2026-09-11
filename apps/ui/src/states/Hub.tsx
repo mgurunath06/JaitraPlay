@@ -1,6 +1,7 @@
 import { quietMimo, reactMimo } from "../components/mimo";
 import { useEffect, useState } from "react";
 import { PlayApp, type PlayableActivity } from "./PlayApp";
+import { ClockApp } from "./ClockApp";
 import { StorybookApp } from "./StorybookApp";
 
 interface Activity extends PlayableActivity {
@@ -17,6 +18,7 @@ export function Hub({ activities, voiceAvailable = false, onPlayingChange, onSto
   useEffect(() => { onPlayingChange(Boolean(selected)); return () => onPlayingChange(false); }, [selected, onPlayingChange]);
   useEffect(() => { setSelected(null); quietMimo(); }, [homeRequest]);
   if (selected) {
+    if (selected.activityId === "tell_time") return <ClockApp voiceAvailable={voiceAvailable} onBack={() => { quietMimo(); setSelected(null); }} />;
     if (selected.activityId === "storybook") {
       return <StorybookApp voiceAvailable={voiceAvailable} onReadingChange={onStoryReadingChange} onBack={() => { quietMimo(); setSelected(null); }} />;
     }

@@ -69,6 +69,12 @@ APP_CATALOG = (
         "description": "Create and explore a new illustrated story.",
         "icon": "📖",
     },
+    {
+        "activity_id": "tell_time",
+        "title": "Time with Mimo",
+        "description": "Read a big clock, from whole hours to five-minute steps.",
+        "icon": "🕒",
+    },
 )
 QUESTION_ACTIVITY_IDS = {"picture_guess", "colours_shapes", "memory_cards", "riddle_guess"}
 

@@ -364,3 +364,12 @@ status and story/page references without prompts or response bodies.
 ## Face recognition baseline experiments
 
 Use **Remember Jaitra → Camera experiment** for opt-in frame diagnostics and local evaluation clips. The live model and matching rules remain the baseline. The [evaluation procedure](deploy/face_eval/README.md) covers clip labelling, session-separated face-api/buffalo_l comparisons, face-size tables, and CUDA setup on Ubuntu. Record real failures before changing geometry, thresholds, or enrollment.
+
+### Time with Mimo and literacy activities
+
+**Time with Mimo** shows a large analog clock and asks the child to tell the time.
+Choose whole hours, half hours, quarter hours, or five-minute steps. Tap or speak
+an answer, reveal a teaching explanation, or skip without being blocked by voice.
+Set `ui.max_hub_choices: 6` in an existing configuration to show the sixth app.
+See [the learning-game assessment](docs/LEARNING_GAMES.md) for the proposed
+literacy activities, current project support, and remaining implementation work.
