@@ -8,7 +8,7 @@ import time
 from pathlib import Path
 from typing import Protocol
 
-from score import iou, load_manifest
+from score import decide, enrolled_people, iou, load_manifest
 
 
 class Embedder(Protocol):
@@ -115,11 +115,19 @@ def main():
         help="Explicit experimental cosine threshold; calibrate on calibration split",
     )
     parser.add_argument(
+        "--margin",
+        type=float,
+        default=0,
+        help="Exploratory runner-up margin; calibrate jointly with threshold",
+    )
+    parser.add_argument(
         "--secondary-photos",
         type=Path,
         help="Optional folder of parent-confirmed child-only photos; separate gallery experiment",
     )
     args = parser.parse_args()
+    if not 0 <= args.margin <= 2:
+        parser.error("Margin must be between 0 and 2")
     if not -1 <= args.threshold <= 1:
         parser.error("Cosine threshold must be between -1 and 1")
     if args.analysis_width < 0 or args.detector_size < 32:
@@ -127,7 +135,8 @@ def main():
     manifest = load_manifest(args.manifest)
     root = Path(args.manifest).resolve().parent
     engine: Embedder = InsightFaceEmbedder(args.model, args.cpu, args.detector_size)
-    gallery = []
+    people = enrolled_people(manifest)
+    galleries = {person: [] for person in people}
     for clip in manifest["clips"]:
         if clip["split"] != "enrollment":
             continue
@@ -135,15 +144,20 @@ def main():
             image, _, _ = frame_at(root / clip["path"], label["time"], args.analysis_width)
             found = engine.faces(image)
             for truth in label["faces"]:
-                if truth["label"] != "jaitra":
+                if truth["label"] not in galleries:
                     continue
                 candidates = [f for f in found if iou(f["box"], truth["box"]) >= 0.3]
-                if len(candidates) == 1:
-                    gallery.append(candidates[0]["descriptor"])
-    if not gallery:
-        raise ValueError("No unambiguous child faces in enrollment annotations")
-    primary_gallery_size = len(gallery)
+                if (
+                    len(candidates) == 1
+                    and sum(iou(f["box"], candidates[0]["box"]) >= 0.3 for f in label["faces"]) == 1
+                ):
+                    galleries[truth["label"]].append(candidates[0]["descriptor"])
+    if not any(galleries.values()):
+        raise ValueError("No unambiguous enrolled faces in enrollment annotations")
+    primary_gallery_size = sum(map(len, galleries.values()))
     if args.secondary_photos:
+        if "jaitra" not in galleries:
+            raise ValueError("Secondary child photos require jaitra in enrolledPeople")
         import cv2
 
         for photo in sorted(args.secondary_photos.iterdir()):
@@ -160,8 +174,9 @@ def main():
             found = engine.faces(image)
             if len(found) != 1:
                 raise ValueError(f"Secondary photo must contain exactly one face: {photo.name}")
-            gallery.append(found[0]["descriptor"])
-    gallery = np.stack(gallery)
+            galleries["jaitra"].append(found[0]["descriptor"])
+    gallery_sizes = {person: len(samples) for person, samples in galleries.items()}
+    galleries = {person: np.stack(samples) for person, samples in galleries.items() if samples}
     with Path(args.output).open("x") as output:
         for clip in manifest["clips"]:
             if clip["split"] == "enrollment":
@@ -173,25 +188,39 @@ def main():
                 started = time.perf_counter()
                 faces = engine.faces(image)
                 for face in faces:
-                    face["score"] = float(np.max(gallery @ face.pop("descriptor")))
-                    face["decision"] = "jaitra" if face["score"] >= args.threshold else "unknown"
+                    descriptor = face.pop("descriptor")
+                    face["scores"] = {
+                        person: float(np.max(gallery @ descriptor))
+                        for person, gallery in galleries.items()
+                    }
+                    ranked = sorted(face["scores"].items(), key=lambda p: -p[1])
+                    face["candidate"], face["score"] = ranked[0]
+                    face["margin"] = ranked[0][1] - ranked[1][1] if len(ranked) > 1 else None
+                    face["decision"] = decide(
+                        face, {"threshold": args.threshold, "margin": args.margin}
+                    )
                     face["sourceFaceWidthPx"] = face["box"]["width"] * width
                     face["analysisFaceWidthPx"] = face["box"]["width"] * image.shape[1]
                 row = dict(
-                    schema=1,
+                    schema=2,
                     model=args.model,
                     session=clip["session"],
                     clip=clip["id"],
                     time=label["time"],
                     sourceWidth=width,
                     sourceHeight=height,
+                    requestedAnalysisWidth=args.analysis_width,
                     analysisWidth=image.shape[1],
                     detectorSize=args.detector_size,
                     backend="cpu" if args.cpu else "cuda",
-                    gallerySize=len(gallery),
-                    secondaryGallerySize=len(gallery) - primary_gallery_size,
+                    gallerySize=sum(gallery_sizes.values()),
+                    gallerySizes=gallery_sizes,
+                    enrolledPeople=people,
+                    secondaryGallerySize=sum(gallery_sizes.values()) - primary_gallery_size,
                     metric="cosine_max",
+                    latencyScope="detection_embedding_metrics_and_matching",
                     threshold=args.threshold,
+                    margin=args.margin,
                     latencyMs=(time.perf_counter() - started) * 1000,
                     faces=faces,
                 )

@@ -1,6 +1,6 @@
 # Ubuntu deployment handoff
 
-Last updated: September 9, 2026. This record combines the earlier verified
+Last updated: September 11, 2026. This record combines the earlier verified
 deployment handoff with command output supplied by the owner in this conversation.
 It is not evidence of a new remote inspection. See also `README.md` and `cloud.md`
 for application behavior and general setup.
@@ -42,6 +42,45 @@ The ElevenLabs secret was previously installed as `admin2:jaitra`, mode `600`,
 inside a mode `700` directory. Its contents were not inspected. Do not recursively
 loosen permissions or ask the owner to paste secrets. Local config, profiles,
 models, secrets, and saved state do not transfer through Git.
+
+## Face evaluation: verified account and interpreter access (September 11)
+
+Read this before suggesting SSH, uv, Python or GPU setup commands. The owner
+requires **one command or one command block at a time**, followed by waiting for
+its output. Do not infer a missing installation from remoteadmin's PATH.
+
+- SSH login is `remoteadmin`; the Python/uv owner and desktop account is `admin2`.
+- `uv` already exists at `/home/admin2/.local/bin/uv`. No reinstall is needed just
+  because `command -v uv` is empty as `remoteadmin`.
+- Shared evaluation interpreter: `/opt/jaitraplay/.local/face-eval-venv/bin/python`.
+  It is a symlink to
+  `/home/admin2/.local/share/uv/python/cpython-3.12-linux-x86_64-gnu/bin/python3.12`.
+- `/home/admin2` is mode `750`, owned by `admin2:admin2`. Thus remoteadmin gets
+  `Permission denied` following this symlink even though the shared venv directory
+  is accessible. This is expected account isolation, not a broken Python install.
+- Run evaluation commands as `admin2` through sudo. Do not chmod the home directory,
+  change ownership recursively, recreate the environment, or use remoteadmin's
+  system Python 3.14 as a substitute for the existing evaluation Python 3.12.
+- Owner-confirmed CUDA check on September 11: `cuda_kernel_verified: true`,
+  ONNX Runtime `1.23.2`, providers `CUDAExecutionProvider`, `CPUExecutionProvider`.
+  CPU appearing second is normal: the test verified a CUDA kernel actually ran.
+- Owner-reported GPU: NVIDIA GeForce RTX 3050, 6144 MiB, driver `595.84`.
+- Latest owner-reported remote HEAD: `84f06dc`. Untracked local files to preserve:
+  `config.yaml.before-storybook`, `run-jaitra.sh`, `run.sh.backup-20260908-183514`.
+- `.local/models/insightface` and `.local/face-eval-venv` exist. At that check,
+  `.local/face-eval` did not exist. No new recordings have been confirmed.
+
+Verified command, from remoteadmin's SSH terminal:
+
+```bash
+sudo -iu admin2 /opt/jaitraplay/.local/face-eval-venv/bin/python /opt/jaitraplay/deploy/face_eval/check_cuda.py
+```
+
+Owner-confirmed model smoke check on September 11: buffalo_l detection and
+recognition loaded with CUDA/CPU providers, the recognizer returned a finite
+512-dimensional embedding, and `buffalo_l_inference_verified` was true. The
+reported synthetic cold smoke time was about 574 ms. This is model-installation
+evidence, not measured recognition accuracy, steady-state latency or end-to-end FPS.
 
 ## Installed tools: confirmed by owner output
 

@@ -30,7 +30,11 @@ export function PeoplePanel({ people, running, video, frame, childProfile, onNam
   const [frozen, setFrozen] = useState(false);
   const start = useRef<{ x: number; y: number } | null>(null);
   const load = async () => {
-    try { setProfiles(await peopleRequest("get") as PersonProfile[]); setReady(true); setStatus(""); }
+    try {
+      const result = await peopleRequest("get");
+      if (!Array.isArray(result)) throw new Error("Invalid saved people response");
+      setProfiles(result as PersonProfile[]); setReady(true); setStatus("");
+    }
     catch { setStatus("Could not load saved people. Retry before enrolling."); }
   };
   useEffect(() => { void load(); }, []);
@@ -106,6 +110,7 @@ export function PeoplePanel({ people, running, video, frame, childProfile, onNam
       if (live?.face && samples[0] && distance(live.face.descriptor, samples[0]) < 0.5) {
         confirmed.current.set(live.id, { id: profile.id, descriptor: [...samples[0]] });
         votes.current.set(live.id, { id: profile.id, count: 3, descriptor: live.face.descriptor });
+        setRecognized(current => ({ ...current, [live.id]: profile }));
         onNamedTracks({ ...Object.fromEntries(Object.entries(recognized).map(([id, p]) => [id, p.name])), [live.id]: profile.name });
       }
       setProfiles(current => [...current.filter(p => p.id !== profile.id), profile]); setEditing(""); setName(""); setPortrait(""); setSuggestion(undefined); resetCapture(); setStatus(`${profile.name} saved as Jaitra’s ${profile.relationship}.`); }

@@ -26,7 +26,7 @@ export class ExperimentLog {
   start(session: string) {
     this.rows = []; this.active = true; this.full = false;
     this.add({ type: "session", schema: 1, session, model: baselineModel, startedAt: new Date().toISOString(),
-      detector: { inputSize: 320, scoreThreshold: .65, minimumBox: 45 }, backend: "cpu", processedFramesOnly: true });
+      scope: "live", analysisWidth: 640, detector: { inputSize: 320, scoreThreshold: .65, minimumBox: 45 }, backend: "cpu", processedFramesOnly: true });
   }
   add(row: object) {
     if (!this.active) return;

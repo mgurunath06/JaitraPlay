@@ -6,6 +6,7 @@ import type { IdentityProfile } from "./types";
 export function ExperimentPanel({ video, log, profile }: {
   video: RefObject<HTMLVideoElement | null>; log: ExperimentLog; profile: RefObject<IdentityProfile | null>;
 }) {
+  const [analysisWidth, setAnalysisWidth] = useState(640);
   const [session, setSession] = useState("evening-01");
   const [logging, setLogging] = useState(false);
   const [recording, setRecording] = useState(false);
@@ -50,19 +51,20 @@ export function ExperimentPanel({ video, log, profile }: {
       else { log.start(session); setLogging(true); }
     }}>{logging ? "Stop and save diagnostics" : "Start diagnostics"}</button>
     <button disabled={!session || replaying} onClick={() => recording ? recorder.current?.stop() : record()}>{recording ? "Stop and save clip" : "Record 30-second evaluation clip"}</button>
-    <p>Offline baseline: pause recognition, then select an evaluation clip. It runs the unchanged face-api detector at the same 640-pixel analysis width and exports one result per second. Filename must match the manifest clip ID.</p>
+    <p>Offline measurement: pause recognition, then choose a width and select clips. The detector stays at input size 320, score threshold 0.65 and minimum box 45 pixels; only analysis resolution changes. The default 640 run reproduces the baseline. Live recognition and live diagnostics stay at 640.</p>
+    <label>Offline analysis width <select value={analysisWidth} disabled={replaying || recording || logging} onChange={e => setAnalysisWidth(Number(e.target.value))}><option value={640}>640 (baseline)</option><option value={1280}>1280</option><option value={0}>Native source resolution</option></select></label>
     <label>Replay evaluation clip <input type="file" accept="video/*" disabled={replaying || recording || logging} onChange={event => {
       const file = event.target.files?.[0]; if (!file) return;
       if (video.current?.srcObject) { setMessage("Pause recognition before replaying a clip."); event.target.value = ""; return; }
       setReplaying(true); setMessage("Replaying baseline clip…");
-      void replayClip(file, session, profile.current).then(() => setMessage("Baseline predictions saved.")).catch(error => setMessage(String(error))).finally(() => setReplaying(false));
+      void replayClip(file, session, profile.current, analysisWidth).then(() => setMessage("Baseline predictions saved.")).catch(error => setMessage(String(error))).finally(() => setReplaying(false));
       event.target.value = "";
     }} /></label>
     <label>Benchmark manifest and clips <input type="file" multiple accept="video/*,.json" disabled={replaying || recording || logging} onChange={event => {
       const files = Array.from(event.target.files ?? []); if (!files.length) return;
       if (video.current?.srcObject) { setMessage("Pause recognition before benchmarking."); event.target.value = ""; return; }
       setReplaying(true); setMessage("Building the baseline gallery from enrollment clips, then evaluating separate sessions…");
-      void replayDataset(files).then(() => setMessage("Dataset baseline predictions saved.")).catch(error => setMessage(String(error))).finally(() => setReplaying(false));
+      void replayDataset(files, analysisWidth).then(() => setMessage("Dataset baseline predictions saved.")).catch(error => setMessage(String(error))).finally(() => setReplaying(false));
       event.target.value = "";
     }} /></label>
     <p role="status">{message}</p>

@@ -1,5 +1,9 @@
 # Camera baseline and face evaluation
 
+Start with [Step Zero — measure before reworking live recognition](STEP_ZERO.md) for the current per-person, 640/1280 comparison protocol. It takes precedence over the older binary-label walkthrough below.
+
+The current rework specification is [Face Recognition Rework Brief v2](../../docs/FACE_RECOGNITION_REWORK_V2.md). It supersedes the original brief and its conversational amendments. The baseline instructions below remain the reproduction reference; the v2 specification does not itself change runtime behavior.
+
 This measures the existing face-api path before changing recognition. Live detector size (320), CPU backend, 640-pixel analysis canvas, 45-pixel minimum box, top-three Euclidean distance threshold (0.42), and tracking rules stay unchanged. Earlier unfinished enrollment changes are preserved locally in `.local/identity-drafts/`.
 
 ## 0. Observe the current build
