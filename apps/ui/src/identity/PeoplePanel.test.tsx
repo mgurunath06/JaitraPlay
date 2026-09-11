@@ -3,9 +3,11 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { PeoplePanel } from "./PeoplePanel";
 import { peopleRequest } from "./people";
 import type * as PeopleModule from "./people";
+import { detectFaces } from "./faces";
 import type { PersonProfile } from "./types";
 import type { Person } from "./tracker";
 vi.mock("./people", async importOriginal => ({ ...await importOriginal<typeof PeopleModule>(), peopleRequest: vi.fn() }));
+vi.mock("./faces", () => ({ detectFaces: vi.fn() }));
 const dad: PersonProfile = { id: "dad", name: "Arun", relationship: "father", version: 1, model: "face-api-1.7.15-recognition", descriptors: [Array(128).fill(0.1)] };
 const person = (value = 0.1, id = 1): Person => ({ id, pose: [], x: 0.5, y: 0.5, raised: false, raisedSince: 0, lowered: true, matches: 0, face: { x: 0.2, y: 0.2, width: 0.2, height: 0.2, descriptor: Array(128).fill(value) } });
 const onNamedTracks = vi.fn();
@@ -15,6 +17,11 @@ beforeEach(() => {
   frame = { current: document.createElement("canvas") }; video = { current: document.createElement("video") };
   vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockImplementation((() => ({ drawImage: vi.fn() })) as unknown as typeof HTMLCanvasElement.prototype.getContext);
   vi.spyOn(HTMLCanvasElement.prototype, "toDataURL").mockReturnValue("data:image/jpeg;base64,face");
+  vi.spyOn(HTMLCanvasElement.prototype, "getBoundingClientRect").mockReturnValue({ x: 0, y: 0, top: 0, left: 0, right: 640, bottom: 480, width: 640, height: 480, toJSON: () => ({}) });
+  Object.defineProperty(HTMLCanvasElement.prototype, "setPointerCapture", { configurable: true, value: vi.fn() });
+  vi.spyOn(HTMLVideoElement.prototype, "videoWidth", "get").mockReturnValue(640);
+  vi.spyOn(HTMLVideoElement.prototype, "videoHeight", "get").mockReturnValue(480);
+  vi.mocked(detectFaces).mockResolvedValue([person().face!]);
   vi.mocked(peopleRequest).mockResolvedValue([]);
 });
 afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.clearAllMocks(); });
@@ -65,10 +72,19 @@ it("queues new faces while the first still is being named", async () => {
   view.rerender(panel([person(), person(0.3, 2)]));
   await screen.findByAltText("Queued face awaiting review");
   expect(screen.getByLabelText("Name")).toHaveValue("Arun");
-  fireEvent.click(screen.getByText("Skip this face"));
+  fireEvent.click(screen.getByText("Try another view shortly"));
   await waitFor(() => expect(screen.queryByAltText("Queued face awaiting review")).not.toBeInTheDocument());
   expect(screen.getByAltText("Captured face awaiting a name")).toBeVisible();
   expect(screen.getByLabelText("Name")).toHaveValue("");
+});
+it("promotes a queued face even when a saved profile was selected", async () => {
+  vi.mocked(peopleRequest).mockResolvedValue([dad]);
+  const view = render(panel([]));
+  await screen.findByText("New person", { selector: "option" });
+  fireEvent.change(screen.getByLabelText("Saved person"), { target: { value: "dad" } });
+  view.rerender(panel([person(0.5)]));
+  expect(await screen.findByAltText("Captured face awaiting a name")).toBeVisible();
+  expect(screen.getByLabelText("Correct identity")).toHaveValue("");
 });
 it("puts a manually corrected name on the live track immediately", async () => {
   vi.mocked(peopleRequest).mockResolvedValue([dad]);
@@ -77,4 +93,15 @@ it("puts a manually corrected name on the live track immediately", async () => {
   fireEvent.click(screen.getByText("Approve: this is Arun"));
   await waitFor(() => expect(onNamedTracks).toHaveBeenLastCalledWith({ 1: "Arun" }));
   expect(screen.getByText("Say “Jaitra, go to Father”")).toBeEnabled();
+});
+it("turns a padded manual selection into the same frozen naming card", async () => {
+  render(panel([]));
+  await screen.findByText("New person", { selector: "option" });
+  fireEvent.click(screen.getByText("Mark a missed face"));
+  const selection = document.querySelector<HTMLCanvasElement>(".people-panel canvas")!;
+  fireEvent.pointerDown(selection, { pointerId: 1, clientX: 200, clientY: 120 });
+  fireEvent.pointerUp(selection, { pointerId: 1, clientX: 360, clientY: 300 });
+  expect(await screen.findByAltText("Captured face awaiting a name")).toBeVisible();
+  expect(detectFaces).toHaveBeenCalledWith(expect.any(HTMLCanvasElement), undefined, expect.objectContaining({ detectorInputSize: 512, scoreThreshold: .5 }));
+  expect(screen.getByRole("status")).toHaveTextContent("manually selected face");
 });

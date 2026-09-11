@@ -50,8 +50,8 @@ export function ClockApp({ onBack, voiceAvailable = false }: { onBack: () => voi
     <button className="hint-button" onClick={() => speakMimo("What time does the clock show?")}>Hear the question</button>
     <AnalogClock time={round.time} revealed={revealed} />
     <p>Short blue hand: hours · Long orange hand: minutes</p>
-    <div className="choice-grid">{round.choices.map(time => <button className="choice-button" key={digitalTime(time)} disabled={revealed} onClick={() => choose(digitalTime(time))}>{digitalTime(time)}</button>)}</div>
-    {!revealed && voiceAvailable && <VoiceAnswer key={number} constrainRecognition={false} choices={round.choices.map(time => ({ value: digitalTime(time), label: spokenTime(time), color: null }))} onAnswer={choose} onTranscript={text => { const answer = matchClockAnswer(text, round.choices); if (answer) choose(answer); }} />}
+    <div className="choice-grid">{round.choices.map((time, index) => <button className="choice-button" key={digitalTime(time)} disabled={revealed} onClick={() => choose(digitalTime(time))}><span className="choice-number" aria-hidden="true">{index + 1}</span>{digitalTime(time)}</button>)}</div>
+    {!revealed && voiceAvailable && <VoiceAnswer key={number} constrainRecognition={false} numberChoices choices={round.choices.map(time => ({ value: digitalTime(time), label: spokenTime(time), color: null }))} onAnswer={choose} onTranscript={text => { const answer = matchClockAnswer(text, round.choices); if (answer) choose(answer); }} />}
     {!revealed && <p>Say the time aloud or tap an answer. A grown-up can help with the microphone.</p>}
     <div className="hint-row"><button className="hint-button" onClick={() => setHint(true)}>Show a hint</button>
       <button className="hint-button" onClick={() => { completed.current = true; setRevealed(true); setFeedback(`Let’s learn together: ${spokenTime(round.time)} (${digitalTime(round.time)}).`); speakMimo(`It is ${spokenTime(round.time)}.`); }}>Let’s learn together</button></div>

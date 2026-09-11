@@ -10,6 +10,7 @@ import { ExperimentLog, measuredFaces } from "./experiment";
 import { PeoplePanel } from "./PeoplePanel";
 import { ExperimentPanel } from "./ExperimentPanel";
 import type { FaceObservation } from "./faces";
+import { LIVE_FACE_CONFIG } from "./config";
 
 type Phase = "idle" | "choose" | "confirm" | "capture" | "review";
 const prompts = ["Look towards the camera", "Keep looking towards the camera", "Turn your face slightly left", "Hold that gentle left turn", "Turn your face slightly right", "Hold that gentle right turn"];
@@ -74,7 +75,7 @@ export function IdentityRoom({ open, paused, quiet, onClose }: { open: boolean; 
     let frameTimestamp = "";
     let lastVideoTime = -1;
     let lastFrameAt = performance.now();
-    const canvas = document.createElement("canvas"); analysisFrame.current = canvas; canvas.width = 640; canvas.height = 480;
+    const canvas = document.createElement("canvas"); analysisFrame.current = null; canvas.width = LIVE_FACE_CONFIG.analysisWidth; canvas.height = 720;
     const cleanup = () => {
       window.clearTimeout(timer); window.clearTimeout(watchdog);
       stream?.getTracks().forEach(t => t.stop()); worker?.terminate();
@@ -105,7 +106,7 @@ export function IdentityRoom({ open, paused, quiet, onClose }: { open: boolean; 
         stream.getVideoTracks().forEach(t => t.addEventListener("ended", fail));
         await element.play();
         if (!active) return;
-        canvas.height = Math.round(640 * element.videoHeight / element.videoWidth);
+        canvas.height = Math.round(LIVE_FACE_CONFIG.analysisWidth * element.videoHeight / element.videoWidth);
         const ctx = canvas.getContext("2d");
         if (!ctx) throw new Error("Canvas unavailable");
         worker = new Worker(new URL("camera/pose-worker.js", new URL(import.meta.env.BASE_URL, window.location.href)));
@@ -136,12 +137,18 @@ export function IdentityRoom({ open, paused, quiet, onClose }: { open: boolean; 
             // Both detectors see the same captured frame; only one frame is in flight.
             const faceStarted = performance.now();
             let observations: FaceObservation[] = [];
-            const found = await faces.detectFaces(canvas, experiment.current.active ? values => { observations = values; } : undefined);
+            const found = await faces.detectFaces(canvas, experiment.current.active ? values => { observations = values; } : undefined, LIVE_FACE_CONFIG);
             const faceLatencyMs = performance.now() - faceStarted;
             if (!active) return;
             const now = performance.now();
             const engine = tracker.current;
             const current = engine.update(data.landmarks, found, now, phaseRef.current === "idle" ? profile.current : null);
+            // PeoplePanel renders after this callback. Preserve the exact analyzed
+            // pixels so its still crop cannot come from a later moving frame.
+            const observedFrame = document.createElement("canvas");
+            observedFrame.width = canvas.width; observedFrame.height = canvas.height;
+            observedFrame.getContext("2d")?.drawImage(canvas, 0, 0);
+            analysisFrame.current = observedFrame;
             setPeople([...current]);
             if (phaseRef.current === "choose") {
               const raised = engine.raisedCandidate(now);

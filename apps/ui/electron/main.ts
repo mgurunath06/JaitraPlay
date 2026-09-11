@@ -128,6 +128,7 @@ function installIpcHandlers(): void {
   });
   ipcMain.handle("jaitra:quit", () => app.quit());
   ipcMain.handle("jaitra:get-snapshot", () => coreRequest("/api/v1/snapshot"));
+  ipcMain.handle("jaitra:activity", () => coreRequest("/api/v1/activity", { method: "POST" }));
   ipcMain.handle("jaitra:send-command", (_event, type: unknown) => {
     if (type !== "BEGIN_INTERACTION" && type !== "WELCOME_COMPLETE") {
       throw new Error("Unsupported child command");

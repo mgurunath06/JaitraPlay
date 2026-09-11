@@ -130,6 +130,11 @@ def create_app(runtime: CoreRuntime, *, manage_lifecycle: bool = True) -> FastAP
     async def snapshot() -> dict[str, object]:
         return runtime.snapshot().model_dump(mode="json", by_alias=True)
 
+    @app.post("/api/v1/activity")
+    async def activity() -> dict[str, bool]:
+        await asyncio.to_thread(runtime.note_activity)
+        return {"recorded": True}
+
     @app.get("/api/v1/activities")
     async def activities() -> list[dict[str, str]]:
         return [item.model_dump(by_alias=True) for item in runtime.snapshot().payload.activities]

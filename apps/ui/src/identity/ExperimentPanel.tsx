@@ -51,7 +51,7 @@ export function ExperimentPanel({ video, log, profile }: {
       else { log.start(session); setLogging(true); }
     }}>{logging ? "Stop and save diagnostics" : "Start diagnostics"}</button>
     <button disabled={!session || replaying} onClick={() => recording ? recorder.current?.stop() : record()}>{recording ? "Stop and save clip" : "Record 30-second evaluation clip"}</button>
-    <p>Offline measurement: pause recognition, then choose a width and select clips. The detector stays at input size 320, score threshold 0.65 and minimum box 45 pixels; only analysis resolution changes. The default 640 run reproduces the baseline. Live recognition and live diagnostics stay at 640.</p>
+    <p>Offline measurement: pause recognition, then choose a width and select clips. The detector stays at input size 320, score threshold 0.65 and minimum box 45 pixels; only analysis resolution changes. The default 640 run reproduces the baseline. Live recognition separately uses the 1280-wide candidate configuration.</p>
     <label>Offline analysis width <select value={analysisWidth} disabled={replaying || recording || logging} onChange={e => setAnalysisWidth(Number(e.target.value))}><option value={640}>640 (baseline)</option><option value={1280}>1280</option><option value={0}>Native source resolution</option></select></label>
     <label>Replay evaluation clip <input type="file" accept="video/*" disabled={replaying || recording || logging} onChange={event => {
       const file = event.target.files?.[0]; if (!file) return;

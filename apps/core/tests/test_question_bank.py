@@ -1,3 +1,5 @@
+import threading
+import time
 from pathlib import Path
 from unittest.mock import patch
 
@@ -33,7 +35,9 @@ def test_bank_persists_a_reserve_for_every_activity(tmp_path: Path) -> None:
         restarted.stop()
 
 
-def test_provider_monitor_selects_priority_and_moves_after_failure(tmp_path: Path) -> None:
+def test_provider_monitor_stops_at_first_success_and_invalidates_it_on_failure(
+    tmp_path: Path,
+) -> None:
     questions = AiQuestionService(tmp_path)
     service = ProviderAvailabilityService(questions, tmp_path)
 
@@ -45,8 +49,32 @@ def test_provider_monitor_selects_priority_and_moves_after_failure(tmp_path: Pat
 
     assert service.available_provider == "mwapi"
     service.mark_failed("mwapi")
-    assert service.available_provider == "startupapi"
+    assert service.available_provider is None
     snapshot = service.snapshot()
-    assert snapshot["available"] is True
-    assert snapshot["provider"] == "startupapi"
+    assert snapshot["available"] is False
+    assert snapshot["providers"]["startupapi"] == "unknown"  # type: ignore[index]
     assert (tmp_path / "question-provider-status.json").is_file()
+
+
+def test_provider_monitor_only_probes_during_activity_and_stops_after_success(
+    tmp_path: Path,
+) -> None:
+    questions = AiQuestionService(tmp_path)
+    service = ProviderAvailabilityService(questions, tmp_path, check_interval_seconds=0.02)
+    probed = threading.Event()
+    with patch(
+        "jaitra_core.providers.availability.probe",
+        side_effect=lambda *_args: probed.set() or {"status": "healthy"},
+    ) as mocked:
+        service.start()
+        try:
+            time.sleep(0.05)
+            assert mocked.call_count == 0
+            service.note_activity()
+            assert probed.wait(0.5)
+            first_count = mocked.call_count
+            service.note_activity()
+            time.sleep(0.06)
+            assert mocked.call_count == first_count
+        finally:
+            service.stop()

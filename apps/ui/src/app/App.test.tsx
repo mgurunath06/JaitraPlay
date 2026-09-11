@@ -35,6 +35,7 @@ describe("child shell", () => {
     vi.useFakeTimers();
     window.jaitra = {
       identity: vi.fn().mockResolvedValue(null),
+      noteActivity: vi.fn().mockResolvedValue(undefined),
       transcribe: vi.fn().mockResolvedValue({ text: "elephant" }),
       quit: vi.fn().mockResolvedValue(undefined),
       getSnapshot: vi.fn().mockResolvedValue(idleSnapshot),
@@ -73,6 +74,19 @@ describe("child shell", () => {
     await act(async () => Promise.resolve());
     expect(screen.getByRole("heading", { name: "Ready to play?" })).toBeVisible();
     expect(screen.getByLabelText("Mimo, your play companion")).toBeVisible();
+  });
+
+  it("reports real interaction at most once per minute", async () => {
+    render(<App />);
+    await act(async () => Promise.resolve());
+    fireEvent.pointerDown(window);
+    await act(async () => Promise.resolve());
+    expect(window.jaitra?.noteActivity).toHaveBeenCalledOnce();
+    fireEvent.keyDown(window, { key: "ArrowRight" });
+    expect(window.jaitra?.noteActivity).toHaveBeenCalledOnce();
+    await act(async () => { await vi.advanceTimersByTimeAsync(60000); });
+    fireEvent.pointerDown(window);
+    expect(window.jaitra?.noteActivity).toHaveBeenCalledTimes(2);
   });
 
   it("emits a semantic command without choosing a destination", async () => {
@@ -121,7 +135,7 @@ describe("child shell", () => {
     expect(screen.queryByRole("button", { name: "Setup" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Exit app" })).toBeNull();
     expect(screen.getByRole("button", { name: "Exit to home" })).toBeVisible();
-    fireEvent.click(screen.getByRole("button", { name: "🐘" }));
+    fireEvent.click(screen.getByRole("button", { name: "Option 2: 🐘" }));
     expect(screen.getByRole("status")).toHaveTextContent("Brilliant");
     expect(screen.getByLabelText("1 stars")).toBeVisible();
     expect(screen.getByText("Hooray! Great thinking!")).toBeVisible();

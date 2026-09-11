@@ -71,22 +71,191 @@ RIDDLES = [
     ("cloud", "☁️", "I float in the sky and can bring rain. What am I?"),
 ]
 
+GEOGRAPHY = [
+    (
+        "north",
+        "⬆️ north",
+        "Which direction is usually at the top of a map?",
+        "Look at a compass rose.",
+        "North is usually at the top of a map.",
+    ),
+    (
+        "equator",
+        "🌍 equator",
+        "What imaginary line circles the middle of Earth?",
+        "It divides Earth into north and south halves.",
+        "The equator circles the middle of Earth.",
+    ),
+    (
+        "asia",
+        "🌏 Asia",
+        "Which is the largest continent?",
+        "It includes India, China and Japan.",
+        "Asia is the largest continent.",
+    ),
+    (
+        "africa",
+        "🌍 Africa",
+        "Which continent contains Egypt and Kenya?",
+        "It is south of Europe.",
+        "Egypt and Kenya are in Africa.",
+    ),
+    (
+        "antarctica",
+        "🧊 Antarctica",
+        "Which continent surrounds the South Pole?",
+        "It is the coldest continent.",
+        "Antarctica surrounds the South Pole.",
+    ),
+    (
+        "pacific",
+        "🌊 Pacific Ocean",
+        "Which is Earth's largest ocean?",
+        "It lies between Asia and the Americas.",
+        "The Pacific is Earth's largest ocean.",
+    ),
+    (
+        "island",
+        "🏝️ island",
+        "What do we call land with water all around it?",
+        "It can be large or small.",
+        "Land surrounded by water is an island.",
+    ),
+    (
+        "river",
+        "🏞️ river",
+        "What long stream of water flows towards a lake or sea?",
+        "It moves downhill through the land.",
+        "A river flows across land.",
+    ),
+    (
+        "mountain",
+        "🏔️ mountain",
+        "What very high landform often has a peak?",
+        "It rises high above nearby land.",
+        "A mountain has a high peak.",
+    ),
+    (
+        "desert",
+        "🏜️ desert",
+        "What dry region receives very little rain?",
+        "Some deserts have sand dunes.",
+        "A desert receives very little rain.",
+    ),
+    (
+        "capital",
+        "⭐ capital city",
+        "What do we call the main government city of a country?",
+        "Maps often mark it with a star.",
+        "It is called a capital city.",
+    ),
+    (
+        "compass",
+        "🧭 compass",
+        "Which tool helps us find north, south, east and west?",
+        "Its needle points towards north.",
+        "A compass shows directions.",
+    ),
+    (
+        "legend",
+        "🗺️ map key",
+        "What part of a map explains its colours and symbols?",
+        "It is also called a legend.",
+        "A map key explains map symbols.",
+    ),
+    (
+        "scale",
+        "📏 map scale",
+        "What tells how map distance compares with real distance?",
+        "It may look like a small ruler.",
+        "A map scale compares map and real distances.",
+    ),
+    (
+        "india",
+        "🇮🇳 India",
+        "New Delhi is the capital of which country?",
+        "Its flag has an Ashoka Chakra.",
+        "New Delhi is the capital of India.",
+    ),
+    (
+        "japan",
+        "🇯🇵 Japan",
+        "Tokyo is the capital of which country?",
+        "It is an island country in Asia.",
+        "Tokyo is the capital of Japan.",
+    ),
+    (
+        "france",
+        "🇫🇷 France",
+        "Paris is the capital of which country?",
+        "The Eiffel Tower is there.",
+        "Paris is the capital of France.",
+    ),
+    (
+        "australia",
+        "🇦🇺 Australia",
+        "Canberra is the capital of which country?",
+        "This country is also a continent.",
+        "Canberra is the capital of Australia.",
+    ),
+    (
+        "east",
+        "➡️ east",
+        "If north is at the top of a map, which direction is on the right?",
+        "Think of the rising sun.",
+        "East is on the right of a north-up map.",
+    ),
+    (
+        "west",
+        "⬅️ west",
+        "If north is at the top of a map, which direction is on the left?",
+        "It is opposite east.",
+        "West is on the left of a north-up map.",
+    ),
+]
+
 PROMPT_OPENERS = {
     "picture_guess": ("", "Picture puzzle: ", "Look and answer: "),
     "colours_shapes": (
-        "", "Colour challenge: ", "Look closely: ", "Mimo asks: ", "Try this: ",
-        "Colour explorer: ", "Shape and colour time: ",
+        "",
+        "Colour challenge: ",
+        "Look closely: ",
+        "Mimo asks: ",
+        "Try this: ",
+        "Colour explorer: ",
+        "Shape and colour time: ",
     ),
     "memory_cards": (
-        "", "Memory mission: ", "Matching time: ", "Find the pairs: ",
-        "Picture memory: ", "Mimo's match: ", "Ready to remember? ", "Pair puzzle: ",
-        "Memory challenge: ", "Turn and match: ", "Match-up game: ", "Remember these: ",
-        "Can you match them? ", "Memory warm-up: ", "Pair-finding time: ",
-        "Use your memory: ", "Where are the pairs? ", "Match every picture: ",
+        "",
+        "Memory mission: ",
+        "Matching time: ",
+        "Find the pairs: ",
+        "Picture memory: ",
+        "Mimo's match: ",
+        "Ready to remember? ",
+        "Pair puzzle: ",
+        "Memory challenge: ",
+        "Turn and match: ",
+        "Match-up game: ",
+        "Remember these: ",
+        "Can you match them? ",
+        "Memory warm-up: ",
+        "Pair-finding time: ",
+        "Use your memory: ",
+        "Where are the pairs? ",
+        "Match every picture: ",
     ),
-    "riddle_guess": ("", "Riddle time: ", "Solve this: ", "Mimo's riddle: ",
-                     "What could it be? ", "Listen closely: ", "Guess this: ",
-                     "Mystery object: ", "Use the clues: "),
+    "riddle_guess": (
+        "",
+        "Riddle time: ",
+        "Solve this: ",
+        "Mimo's riddle: ",
+        "What could it be? ",
+        "Listen closely: ",
+        "Guess this: ",
+        "Mystery object: ",
+        "Use the clues: ",
+    ),
 }
 
 
@@ -106,7 +275,7 @@ def repeats_question(
     if any(SequenceMatcher(None, target, normalized(old)).ratio() > 0.82 for old in prompts):
         return True
     # Reject rephrased quizzes aimed at the same answer across recently played games.
-    return any(old.answer == question.answer and old.kind == question.kind for old in history[:12])
+    return any(old.answer == question.answer and old.kind == question.kind for old in history)
 
 
 def shuffle_question_choices(
@@ -244,6 +413,42 @@ def local_question_candidates(activity_id: str) -> list[GeneratedQuestion]:
                 value,
                 f"The answer is {label} {value}.",
             )
+        geography_values = [(value, label) for value, label, *_rest in GEOGRAPHY]
+        for index, (value, label, clue, hint, explanation) in enumerate(GEOGRAPHY):
+            others = [item for item in geography_values if item[0] != value]
+            add(
+                clue,
+                hint,
+                [
+                    (value, label),
+                    *[others[(index + step * 3) % len(others)] for step in range(1, 4)],
+                ],
+                value,
+                explanation,
+            )
+        for index, (colour, _hex_value) in enumerate(COLOURS):
+            others = [item for item in COLOURS if item[0] != colour]
+            items = [
+                (colour, colour),
+                *[
+                    (
+                        others[(index + step) % len(others)][0],
+                        others[(index + step) % len(others)][0],
+                    )
+                    for step in range(3)
+                ],
+            ]
+            add(
+                f"Which colour swatch is {colour}?",
+                "Look carefully at all four colours.",
+                items,
+                colour,
+                f"That swatch is {colour}.",
+            )
+            palette = dict(COLOURS)
+            candidates[-1].choices = [
+                QuestionChoice(value=item, label=name, color=palette[item]) for item, name in items
+            ]
     else:
         raise ValueError("unsupported activity")
 

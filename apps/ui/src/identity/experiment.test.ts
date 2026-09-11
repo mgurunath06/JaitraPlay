@@ -1,5 +1,6 @@
 import { expect, it } from "vitest";
 import { ExperimentLog, measuredFaces, scoreFace } from "./experiment";
+import { LIVE_FACE_CONFIG } from "./config";
 import type { IdentityProfile } from "./types";
 const descriptor = Array(128).fill(.1);
 const profile: IdentityProfile = { version: 1, model: "face-api-1.7.15-recognition", name: "Jaitra", descriptors: [descriptor, descriptor, descriptor] };
@@ -16,6 +17,8 @@ it("exports no facial descriptors and preserves filtered detections", () => {
 it("does not collect until enabled and bounds the log without overwriting evidence", () => {
   const log = new ExperimentLog(); log.add({ type: "frame" }); expect(log.rows).toHaveLength(0);
   log.start("test");
+  expect(JSON.parse(log.rows[0])).toMatchObject({ analysisWidth: LIVE_FACE_CONFIG.analysisWidth,
+    detector: { inputSize: LIVE_FACE_CONFIG.detectorInputSize, scoreThreshold: LIVE_FACE_CONFIG.scoreThreshold, minimumBox: LIVE_FACE_CONFIG.minimumBox } });
   for (let i = 0; i < 20001; i++) log.add({ type: "frame", i });
   expect(log.rows).toHaveLength(20000); expect(log.full).toBe(true); expect(log.active).toBe(false);
 });

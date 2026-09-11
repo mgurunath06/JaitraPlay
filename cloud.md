@@ -80,7 +80,8 @@ This is a local trust boundary, not an authenticated public service.
 ### Games and Mimo
 
 The hub offers every activity registered by the running core, including Picture Guess,
-Colour Quest, Memory Match, Riddle Garden, Mimo's Storybook, and Time with Mimo. Quizzes mix cloud output with curated
+Memory Match, Riddle & Discovery Garden, Mimo's Storybook, and Time with Mimo. Colour,
+geography, map, and object-riddle questions are mixed inside Discovery Garden. Quizzes mix cloud output with curated
 picture, counting, odd-one-out, colour/shape, riddle, memory, and room-hunt content.
 Provider failure or repeated output falls back to local questions. History tracks
 the last 120 generated questions across activities and restarts. Local pools use
@@ -386,14 +387,14 @@ check establishes startup and snapshot delivery, not microphone recognition qual
 
 ## Independent provider health checks
 
-`deploy/scripts/check-provider-health.sh` runs without the app, `uv`, or optional
+`deploy/scripts/check-provider-health.sh --force` runs an explicit on-demand check without the app, `uv`, or optional
 Python packages. It recursively inspects every `*.json` in `.claude` each run, so
 new profiles are picked up automatically. It sends a minimal text-generation
 request per JSON provider, plus an ElevenLabs audio-processing request, not just a TCP ping. These requests consume provider usage.
 It does not test image generation or send child data.
 
 ```bash
-bash deploy/scripts/check-provider-health.sh
+bash deploy/scripts/check-provider-health.sh --force
 ```
 
 Options: `--profiles-dir PATH`, `--output PATH`, and `--timeout SECONDS` (default 30,
@@ -437,8 +438,9 @@ sudo systemctl enable --now jaitra-provider-health.timer
 sudo systemctl start jaitra-provider-health.service
 ```
 
-The timer runs at minute 00 and 30, catches a missed calendar run when activated,
-and survives reboot. The service has a 25-minute total deadline. It cannot run
+The timer wakes at minute 00 and 30, but its checker exits without an external request unless
+the app recorded real interaction in the preceding five minutes and no provider is already
+healthy. It catches a missed calendar run when activated and survives reboot. The service has a 25-minute total deadline. It cannot run
 while the machine is off; network outages appear as failed probes. systemd
 continues scheduling after a failed check. Ensure `admin2` can read all profiles
 and write `.local/state`; installing the timer does not alter credential ownership.

@@ -15,6 +15,21 @@ from typing import Any
 from urllib.parse import urlsplit
 
 
+def should_probe(activity_path: Path, status_path: Path, now: float | None = None) -> bool:
+    """Allow a scheduled probe only during recent use and until one provider works."""
+    try:
+        status = json.loads(status_path.read_text(encoding="utf-8"))
+        if status.get("available") is True:
+            return False
+    except (OSError, ValueError, TypeError, json.JSONDecodeError):
+        pass
+    try:
+        age = (time.time() if now is None else now) - activity_path.stat().st_mtime
+        return 0 <= age <= 300
+    except OSError:
+        return False
+
+
 class NoRedirect(urllib.request.HTTPRedirectHandler):
     """Never forward provider credentials to a redirect target."""
 
@@ -203,9 +218,16 @@ def main() -> int:
         "--elevenlabs-env", type=Path, default=root / ".local/secrets/elevenlabs.env"
     )
     parser.add_argument("--timeout", type=float, default=30)
+    parser.add_argument("--require-recent-activity", action="store_true")
     args = parser.parse_args()
     if not 0 < args.timeout <= 120:
         parser.error("--timeout must be greater than 0 and at most 120 seconds")
+    if args.require_recent_activity and not should_probe(
+        root / ".local/state/app-activity",
+        root / ".local/state/question-provider-status.json",
+    ):
+        print(json.dumps({"skipped": True, "reason": "IDLE_OR_ALREADY_HEALTHY"}))
+        return 0
     report = check_directory(args.profiles_dir, args.timeout, args.elevenlabs_env)
     serialized = json.dumps(report, indent=2)
     args.output.parent.mkdir(parents=True, exist_ok=True)

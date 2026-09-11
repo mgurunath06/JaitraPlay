@@ -3,10 +3,10 @@ import { useEffect, useRef, useState } from "react";
 import type { GeneratedQuestion } from "../../../../packages/contracts/src";
 import { readSettings } from "../setup/settings";
 import { coreClient } from "../app/coreClient";
-import { matchAnswer, recognitionPhrases } from "./match";
+import { matchAnswer, matchChoiceNumber, recognitionPhrases } from "./match";
 import { CaptureError, recordVoice, type Recording } from "./record";
 
-export function VoiceAnswer({ choices, onAnswer, onTranscript, useCorrections = true, constrainRecognition = true }: { choices: GeneratedQuestion["choices"]; onAnswer: (value: string) => void; onTranscript?: (text: string) => void; useCorrections?: boolean; constrainRecognition?: boolean }) {
+export function VoiceAnswer({ choices, onAnswer, onTranscript, useCorrections = true, constrainRecognition = true, numberChoices = false }: { choices: GeneratedQuestion["choices"]; onAnswer: (value: string) => void; onTranscript?: (text: string) => void; useCorrections?: boolean; constrainRecognition?: boolean; numberChoices?: boolean }) {
   const [state, setState] = useState<"idle" | "starting" | "listening" | "processing">("idle");
   const [level, setLevel] = useState(0);
   const [message, setMessage] = useState("");
@@ -35,10 +35,10 @@ export function VoiceAnswer({ choices, onAnswer, onTranscript, useCorrections = 
       if (!audio.audio) throw new Error("No audio");
       const result = await coreClient.transcribe({
         ...audio,
-        phrases: constrainRecognition ? recognitionPhrases(choices) : undefined,
+        phrases: constrainRecognition ? recognitionPhrases(choices, numberChoices) : undefined,
       });
       if (current.signal.aborted) return;
-      const matched = matchAnswer(result.text, choices, useCorrections ? readSettings().voiceAliases : {});
+      const matched = matchAnswer(result.text, choices, useCorrections ? readSettings().voiceAliases : {}) ?? (numberChoices ? matchChoiceNumber(result.text, choices) : null);
       diagnostic("voice.match", { matched: Boolean(matched), words: result.text.split(/\s+/).filter(Boolean).length });
       onTranscript?.(result.text);
       setMessage(result.text ? `I heard “${result.text}”.${matched ? " Got it!" : " Try one answer shown on the screen."}` : "Sound was captured, but no words were recognised. Check the input meter in Setup and try toggling Browser noise cleanup.");

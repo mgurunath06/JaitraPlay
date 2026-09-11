@@ -11,6 +11,12 @@ async function getSnapshot(): Promise<StateSnapshot> {
   return (await response.json()) as StateSnapshot;
 }
 
+async function noteActivity(): Promise<void> {
+  if (window.jaitra) { await window.jaitra.noteActivity(); return; }
+  if (!import.meta.env.DEV) return;
+  await fetch("/api/v1/activity", { method: "POST" });
+}
+
 async function sendCommand(type: CommandType): Promise<unknown> {
   if (window.jaitra) return window.jaitra.sendCommand(type);
   if (!import.meta.env.DEV) throw new Error("Electron bridge is unavailable");
@@ -86,4 +92,4 @@ async function getStorybookImage(storyId: string, pageNumber: number): Promise<s
   return `/api/v1/storybooks/${encodeURIComponent(storyId)}/pages/${pageNumber}/image`;
 }
 
-export const coreClient = { getSnapshot, sendCommand, getQuestion, transcribe, createStorybook, listStorybooks, getStorybook, getStorybookImage };
+export const coreClient = { getSnapshot, noteActivity, sendCommand, getQuestion, transcribe, createStorybook, listStorybooks, getStorybook, getStorybookImage };

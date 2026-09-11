@@ -46,6 +46,15 @@ def test_riddle_choices_are_shuffled_without_changing_the_answer() -> None:
     assert shuffled.choices != original.choices
 
 
+def test_riddle_garden_has_a_large_mix_of_riddles_colours_and_geography() -> None:
+    questions = local_question_candidates("riddle_guess")
+    prompts = {question.prompt for question in questions}
+    assert len(prompts) >= 500
+    assert any("map" in prompt.casefold() for prompt in prompts)
+    assert any("continent" in prompt.casefold() for prompt in prompts)
+    assert any(any(choice.color for choice in question.choices) for question in questions)
+
+
 def test_history_survives_restart_and_provider_duplicates(
     config: AppConfig,
     repository_root: Path,

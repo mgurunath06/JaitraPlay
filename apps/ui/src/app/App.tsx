@@ -23,6 +23,18 @@ export function App() {
   const [cameraView, setCameraView] = useState(false);
   const [identityOpen, setIdentityOpen] = useState(false);
   useEffect(() => {
+    let lastSent = 0;
+    const active = () => {
+      const now = Date.now();
+      if (now - lastSent < 60000) return;
+      lastSent = now;
+      void coreClient.noteActivity().catch(() => undefined);
+    };
+    window.addEventListener("pointerdown", active);
+    window.addEventListener("keydown", active);
+    return () => { window.removeEventListener("pointerdown", active); window.removeEventListener("keydown", active); };
+  }, []);
+  useEffect(() => {
     const timer = window.setTimeout(() => setSplashVisible(false), SPLASH_MILLISECONDS);
     return () => window.clearTimeout(timer);
   }, []);

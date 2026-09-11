@@ -14,6 +14,7 @@ contextBridge.exposeInMainWorld("jaitra", {
   transcribe: (request: { audio: string; sampleRate: number; phrases?: string[] }) => ipcRenderer.invoke("jaitra:transcribe", request),
   quit: () => ipcRenderer.invoke("jaitra:quit"),
   getSnapshot: () => ipcRenderer.invoke("jaitra:get-snapshot"),
+  noteActivity: () => ipcRenderer.invoke("jaitra:activity"),
   sendCommand: (type: CommandType) => ipcRenderer.invoke("jaitra:send-command", type),
   getQuestion: (activityId: string, request: QuestionRequest) =>
     ipcRenderer.invoke("jaitra:get-question", activityId, request),

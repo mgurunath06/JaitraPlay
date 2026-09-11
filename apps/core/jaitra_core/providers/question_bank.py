@@ -20,6 +20,7 @@ QUESTION_ACTIVITIES = ("picture_guess", "colours_shapes", "memory_cards", "riddl
 MINIMUM_UNDISPLAYED_PER_ACTIVITY = 200
 REFILL_TARGET_PER_ACTIVITY = 220
 MAXIMUM_QUESTIONS = 1000
+BANK_VERSION = 2
 
 
 class QuestionBank:
@@ -246,6 +247,8 @@ class QuestionBank:
             return
         try:
             data = json.loads(self.path.read_text(encoding="utf-8"))
+            if data.get("version") != BANK_VERSION:
+                raise ValueError("question bank content version changed")
             entries = data["questions"]
             if not isinstance(entries, list):
                 raise ValueError("questions must be a list")
@@ -271,7 +274,7 @@ class QuestionBank:
             self._entries = []
 
     def _save_locked(self) -> None:
-        payload = {"version": 1, "questions": self._entries}
+        payload = {"version": BANK_VERSION, "questions": self._entries}
         temporary = self.path.with_suffix(".tmp")
         temporary.write_text(
             json.dumps(payload, ensure_ascii=False, separators=(",", ":")) + "\n",

@@ -26,7 +26,7 @@ playback are not implemented. Gameplay uses the core's question API; rounds and 
 Questions are remembered on this appliance across app restarts (the latest 120 rounds).
 Provider repeats are rejected using prompt similarity and recent answer targets. Games mix
 provider questions with local picture identification, counting, odd-one-out, colour/shape,
-memory, and riddle challenges. Local pools use unseen questions first, then the least recently
+memory, riddle, geography, and map challenges. Local pools use unseen questions first, then the least recently
 seen once exhausted; unlimited uniqueness is not guaranteed. Room hunts are self-reported,
 skippable look-and-point activities and do not use a camera.
 
@@ -168,8 +168,8 @@ JAITRA_CONFIG=config.yaml uv run --extra voice jaitra-core
 The systemd core launcher includes the voice extra. In development, run Vite and Electron
 as described above. Use `--extra voice` with `uv run` to keep the optional package installed.
 
-In Picture Guess, Colour Quest quizzes, or Riddle Garden, select **Speak answer** and say one
-visible answer such as “blue”, “elephant”, or “three”. Listening stops after 6.5 seconds and a
+In Picture Guess or Riddle & Discovery Garden, select **Speak answer** and say one
+visible answer such as “blue” or “elephant”, or say its numbered position such as “option two”. Listening stops after 6.5 seconds and a
 clear match is submitted automatically. Recognition is limited to the visible choices, improving
 accuracy and preventing unrelated speech from selecting an answer. Touch controls remain available.
 Memory cards and room hunts currently use touch controls.
@@ -324,11 +324,11 @@ Exit app; each game has Exit to home instead of the administrative toolbar.
 
 ## Provider API health checks
 
-Question delivery does not probe providers. The core keeps the latest routing flag in
-`.local/state/question-provider-status.json`; a background monitor checks each configured
-provider every five minutes and selects the first healthy provider in MWAPI, StartupAPI,
-OpenRouter order. If generation fails, that provider is removed from routing immediately and
-questions come from the local bank until a background check finds a healthy provider.
+Question delivery does not probe providers. Real pointer or keyboard activity wakes the provider
+monitor, at most once every five minutes and only when the app was used during those five minutes.
+It stops probing after the first healthy provider in MWAPI, StartupAPI, OpenRouter order. If live
+generation later fails, that provider is removed and an active app may retry the monitor; an idle
+app uses no provider health requests.
 
 The persistent fallback bank is `.local/state/question-bank/questions.json`. On startup it
 contains 220 unseen questions for each of the four question games. Its background builder
@@ -340,12 +340,13 @@ bank counts are also available from `GET /api/v1/health` as `questionProvider` a
 Run all `.claude` provider text checks independently of the app:
 
 ```bash
-bash deploy/scripts/check-provider-health.sh
+bash deploy/scripts/check-provider-health.sh --force
 ```
 
 The latest report is `.local/state/provider-health.json`. These are real, small
 text-generation requests and consume provider usage. A systemd timer can run them
-every 30 minutes, including when the app is closed. See
+at minutes 00 and 30, but it exits without an API request when the app has had no recent
+interaction or a provider is already healthy. See
 [installation and report details](cloud.md#independent-provider-health-checks).
 
 

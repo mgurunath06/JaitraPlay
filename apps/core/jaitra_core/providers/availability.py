@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import threading
+import time
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -25,16 +26,20 @@ class ProviderAvailabilityService:
     ) -> None:
         self.questions = questions
         self.path = state_dir / "question-provider-status.json"
+        self.activity_path = state_dir / "app-activity"
         self.check_interval_seconds = check_interval_seconds
         self.probe_timeout_seconds = probe_timeout_seconds
         self._lock = threading.RLock()
         self._stop_event = threading.Event()
+        self._wake_event = threading.Event()
         self._worker: threading.Thread | None = None
         self._statuses: dict[ProviderName, bool | None] = {
             name: None for name, _path in questions.profile_paths()
         }
         self._available_provider: ProviderName | None = None
         self._checked_at: str | None = None
+        self._last_activity = float("-inf")
+        self._last_check = float("-inf")
 
     @property
     def available_provider(self) -> ProviderName | None:
@@ -53,6 +58,7 @@ class ProviderAvailabilityService:
 
     def stop(self) -> None:
         self._stop_event.set()
+        self._wake_event.set()
         if self._worker is not None:
             self._worker.join(
                 timeout=(len(self.questions.profile_paths()) * self.probe_timeout_seconds) + 1
@@ -65,6 +71,7 @@ class ProviderAvailabilityService:
             self._statuses[provider] = False
             self._choose_provider_locked()
             self._save_locked()
+        self._wake_event.set()
 
     def mark_available(self, provider: ProviderName) -> None:
         with self._lock:
@@ -72,13 +79,24 @@ class ProviderAvailabilityService:
             self._choose_provider_locked()
             self._save_locked()
 
+    def note_activity(self) -> None:
+        """Record real UI activity without treating background polling as activity."""
+        with self._lock:
+            self._last_activity = time.monotonic()
+            self.activity_path.parent.mkdir(parents=True, exist_ok=True)
+            self.activity_path.touch()
+        self._wake_event.set()
+
     def check_now(self) -> None:
+        self._last_check = time.monotonic()
         statuses: dict[ProviderName, bool] = {}
         for name, path in self.questions.profile_paths():
             if self._stop_event.is_set():
                 return
             result = probe(path, self.probe_timeout_seconds)
             statuses[name] = result.get("status") == "healthy"
+            if statuses[name]:
+                break
         with self._lock:
             self._statuses.update(statuses)
             self._checked_at = datetime.now(UTC).isoformat()
@@ -108,8 +126,19 @@ class ProviderAvailabilityService:
 
     def _run(self) -> None:
         while not self._stop_event.is_set():
-            self.check_now()
-            self._stop_event.wait(self.check_interval_seconds)
+            self._wake_event.wait(self.check_interval_seconds)
+            self._wake_event.clear()
+            if self._stop_event.is_set():
+                return
+            with self._lock:
+                now = time.monotonic()
+                should_check = (
+                    self._available_provider is None
+                    and now - self._last_activity <= 300
+                    and now - self._last_check >= self.check_interval_seconds
+                )
+            if should_check:
+                self.check_now()
 
     def _choose_provider_locked(self) -> None:
         self._available_provider = next(

@@ -1,6 +1,7 @@
 import type { FaceObservation } from "./faces";
 import type { IdentityProfile } from "./types";
 import { distance } from "./tracker";
+import { LIVE_FACE_CONFIG } from "./config";
 
 export const baselineModel = "face-api-1.7.15-recognition";
 export function scoreFace(descriptor: number[], profile: IdentityProfile | null) {
@@ -26,7 +27,7 @@ export class ExperimentLog {
   start(session: string) {
     this.rows = []; this.active = true; this.full = false;
     this.add({ type: "session", schema: 1, session, model: baselineModel, startedAt: new Date().toISOString(),
-      scope: "live", analysisWidth: 640, detector: { inputSize: 320, scoreThreshold: .65, minimumBox: 45 }, backend: "cpu", processedFramesOnly: true });
+      scope: "live", analysisWidth: LIVE_FACE_CONFIG.analysisWidth, detector: { inputSize: LIVE_FACE_CONFIG.detectorInputSize, scoreThreshold: LIVE_FACE_CONFIG.scoreThreshold, minimumBox: LIVE_FACE_CONFIG.minimumBox }, backend: "cpu", processedFramesOnly: true });
   }
   add(row: object) {
     if (!this.active) return;

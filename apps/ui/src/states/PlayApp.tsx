@@ -115,14 +115,15 @@ function QuizRound({ activityId, question, hintUsed, onHint, onCorrect, onNext, 
           const selected = choice === item.value;
           const answer = choice !== null && item.value === question.answer;
           return (
-            <button key={item.value} type="button" className={`choice-button ${selected ? "selected" : ""} ${answer ? "correct" : ""}`} disabled={choice !== null} onClick={() => choose(item.value)} aria-label={colourGame ? `Colour choice ${index + 1}` : item.label}>
+            <button key={item.value} type="button" className={`choice-button ${selected ? "selected" : ""} ${answer ? "correct" : ""}`} disabled={choice !== null} onClick={() => choose(item.value)} aria-label={`Option ${index + 1}: ${item.label}`}>
+              <span className="choice-number" aria-hidden="true">{index + 1}</span>
               {item.color ? <span className="colour-swatch" style={/[●■▲★]/u.test(item.label) ? { color: item.color, backgroundColor: "transparent", fontSize: "5rem" } : { backgroundColor: item.color }} aria-hidden="true">{/[●■▲★]/u.test(item.label) ? item.label : ""}</span> : <span className={`choice-label ${/^[\p{Extended_Pictographic}\p{Emoji_Presentation}\uFE0F\u200D\s]+$/u.test(item.label) ? "is-picture" : ""}`}>{item.label}</span>}
               {!colourGame && <span className="sr-only">{item.value}</span>}
             </button>
           );
         })}
       </div>
-      {choice === null && voiceAvailable && <VoiceAnswer choices={question.choices} onAnswer={choose} />}
+      {choice === null && voiceAvailable && <VoiceAnswer choices={question.choices} numberChoices onAnswer={choose} />}
       {choice !== null && (
         <div className={`game-feedback ${correct ? "success" : "try-again"}`} role="status">
           <span><strong>{correct ? "Brilliant! ⭐" : "Good try!"}</strong> {question.explanation}</span>

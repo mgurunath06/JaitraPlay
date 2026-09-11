@@ -7,4 +7,9 @@ repository_root="$(cd -- "${script_dir}/../.." && pwd)"
 mkdir -p "${repository_root}/.local/state"
 exec 9>"${repository_root}/.local/state/provider-health.lock"
 flock -n 9 || { echo "A provider health check is already running." >&2; exit 2; }
-exec python3 "${repository_root}/apps/core/jaitra_core/providers/healthcheck.py" "$@"
+guard=(--require-recent-activity)
+if [[ "${1:-}" == "--force" ]]; then
+  guard=()
+  shift
+fi
+exec python3 "${repository_root}/apps/core/jaitra_core/providers/healthcheck.py" "${guard[@]}" "$@"

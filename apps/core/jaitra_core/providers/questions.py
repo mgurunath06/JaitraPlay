@@ -149,8 +149,10 @@ class AiQuestionService:
                 "pairs."
             ),
             "riddle_guess": (
-                "Create a short what-am-I riddle about a tool, food, vehicle, instrument or "
-                "natural object. Give four emoji-and-name choices. Avoid animal identification."
+                "Create either a short what-am-I riddle, a colour question, or a child-friendly "
+                "geography/map question. Rotate among tools, food, vehicles, instruments, natural "
+                "objects, continents, oceans, directions, map symbols and simple capitals. Give "
+                "four clear choices and avoid animal identification."
             ),
         }
         if activity_id not in activity_rules:

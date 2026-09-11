@@ -4,6 +4,7 @@ import { distance, faceMatches } from "./tracker";
 import type { IdentityProfile, PersonProfile } from "./types";
 import { identifyPerson, peopleRequest, suggestPerson } from "./people";
 import { speakMimo } from "../components/mimo";
+import { LIVE_FACE_CONFIG } from "./config";
 
 const relationships: PersonProfile["relationship"][] = ["father", "mother", "sibling", "grandparent", "relative", "friend", "caregiver", "other"];
 export function PeoplePanel({ people, running, video, frame, childProfile, onNamedTracks }: { people: Person[]; running: boolean; video: RefObject<HTMLVideoElement | null>; frame: RefObject<HTMLCanvasElement | null>; childProfile?: IdentityProfile | null; onNamedTracks: (names: Record<number, string>) => void }) {
@@ -13,6 +14,7 @@ export function PeoplePanel({ people, running, video, frame, childProfile, onNam
   const [pending, setPending] = useState<{ trackId: number; portrait: string; descriptor: number[]; suggestion: ReturnType<typeof suggestPerson> }[]>([]);
   const [portrait, setPortrait] = useState<string>("");
   const reviewed = useRef(new Set<number>());
+  const retryAfter = useRef(new Map<number, number>());
   const [ready, setReady] = useState(false);
   const [name, setName] = useState("");
   const [relationship, setRelationship] = useState<PersonProfile["relationship"]>("father");
@@ -70,7 +72,7 @@ export function PeoplePanel({ people, running, video, frame, childProfile, onNam
     if (!v?.width) return;
     const captures: typeof pending = [];
     for (const person of people) {
-      if (!person.face || rejected.includes(person.id) || reviewed.current.has(person.id) || identifyPerson(person.face, profiles) || (childProfile && faceMatches(person.face, childProfile))) continue;
+      if (!person.face || rejected.includes(person.id) || reviewed.current.has(person.id) || (retryAfter.current.get(person.id) ?? 0) > Date.now() || identifyPerson(person.face, profiles) || (childProfile && faceMatches(person.face, childProfile))) continue;
       const f = person.face, crop = document.createElement("canvas");
       crop.width = 240; crop.height = Math.round(240 * f.height / f.width);
       crop.getContext("2d")?.drawImage(v, f.x * v.width, f.y * v.height, f.width * v.width, f.height * v.height, 0, 0, crop.width, crop.height);
@@ -81,14 +83,18 @@ export function PeoplePanel({ people, running, video, frame, childProfile, onNam
     if (captures.length) setPending(current => [...current, ...captures].slice(0, 20));
   }, [people, ready, running, profiles, rejected, frame, pending.length, childProfile]);
   useEffect(() => {
-    if (portrait || samples.length || editing || busy || !pending.length) return;
+    if (portrait || samples.length || busy || !pending.length) return;
     const capture = pending[0];
+    setEditing("");
     setPortrait(capture.portrait); setSelected(capture.trackId);
     setSamples([capture.descriptor]); last.current = capture.descriptor;
     setSuggestion(capture.suggestion); setName("");
     setPending(current => current.slice(1));
     setStatus("Who is this? Name this captured face and choose their relationship, or mark it as not a person.");
-  }, [portrait, samples.length, editing, busy, pending]);
+  }, [portrait, samples.length, busy, pending]);
+  useEffect(() => {
+    if (!portrait && samples.length && pending.length) setStatus(`${pending.length} new face ${pending.length === 1 ? "is" : "are"} waiting. Save or discard the current captured views to review it.`);
+  }, [portrait, samples.length, pending.length]);
   const add = (descriptor: number[]) => {
     if (last.current === descriptor) { setStatus("Wait for a fresh view."); return; }
     const reference = samples[0] ?? profiles.find(p => p.id === editing)?.descriptors[0];
@@ -131,7 +137,7 @@ export function PeoplePanel({ people, running, video, frame, childProfile, onNam
         const p = profiles.find(p => p.id === e.target.value); setEditing(p?.id ?? ""); setName(p?.name ?? ""); setRelationship(p?.relationship ?? "father");
       }}><option value="">Someone new — enter name below</option>{profiles.map(p => <option key={p.id} value={p.id}>{p.name} — {p.relationship}</option>)}</select></label>
       <button onClick={() => { if (selected !== null) setRejected(current => [...current, selected]); setPortrait(""); resetCapture(); setSelected(null); }}>Not a person / discard face</button>
-      <button onClick={() => { setPortrait(""); resetCapture(); setSelected(null); }}>Skip this face</button>
+      <button onClick={() => { if (selected !== null) { reviewed.current.delete(selected); retryAfter.current.set(selected, Date.now() + 3000); } setPortrait(""); resetCapture(); setSelected(null); setStatus("Skipped. A fresh view of this face can be offered again shortly."); }}>Try another view shortly</button>
     </div>}
     {pending.length > 0 && <div aria-label="Faces waiting for review"><p>{pending.length} more captured {pending.length === 1 ? "face" : "faces"} waiting for review. The live video continues.</p>{pending.map(p => <img key={p.trackId} src={p.portrait} alt="Queued face awaiting review" width={96} />)}</div>}
     {!ready && <button onClick={() => void load()}>Retry loading people</button>}
@@ -158,11 +164,17 @@ export function PeoplePanel({ people, running, video, frame, childProfile, onNam
       const c = e.currentTarget, rect = c.getBoundingClientRect(), a = start.current; start.current = null; if (!a) return;
       const x = Math.max(0, Math.min(c.width, (e.clientX - rect.left) * c.width / rect.width));
       const y = Math.max(0, Math.min(c.height, (e.clientY - rect.top) * c.height / rect.height));
-      const w = Math.abs(x - a.x), h = Math.abs(y - a.y); if (w < 20 || h < 20) return;
-      const crop = document.createElement("canvas"); const scale = Math.min(640 / w, 640 / h); crop.width = Math.round(w * scale); crop.height = Math.round(h * scale);
-      crop.getContext("2d")?.drawImage(c, Math.min(x, a.x), Math.min(y, a.y), w, h, 0, 0, crop.width, crop.height);
+      const drawnX = Math.min(x, a.x), drawnY = Math.min(y, a.y), drawnW = Math.abs(x - a.x), drawnH = Math.abs(y - a.y); if (drawnW < 20 || drawnH < 20) return;
+      const padX = drawnW * .35, padY = drawnH * .35;
+      const cropX = Math.max(0, drawnX - padX), cropY = Math.max(0, drawnY - padY);
+      const cropW = Math.min(c.width - cropX, drawnW + padX * 2), cropH = Math.min(c.height - cropY, drawnH + padY * 2);
+      const crop = document.createElement("canvas"); const scale = Math.min(640 / cropW, 640 / cropH); crop.width = Math.round(cropW * scale); crop.height = Math.round(cropH * scale);
+      crop.getContext("2d")?.drawImage(c, cropX, cropY, cropW, cropH, 0, 0, crop.width, crop.height);
       setBusy(true);
-      try { const { detectFaces } = await import("./faces"); const found = await detectFaces(crop); if (found.length === 1) { add(found[0].descriptor); setFrozen(false); } else setStatus("Select exactly one clear face, or capture a closer view."); }
+      try { const { detectFaces } = await import("./faces"); const found = await detectFaces(crop, undefined, LIVE_FACE_CONFIG); if (found.length === 1) {
+        const descriptor = [...found[0].descriptor]; setEditing(""); setSelected(null); setPortrait(crop.toDataURL("image/jpeg")); setSamples([descriptor]); last.current = descriptor;
+        setSuggestion(suggestPerson(found[0], profiles)); setName(""); setFrozen(false); setStatus("Who is this? Name this manually selected face and choose their relationship.");
+      } else setStatus("No single clear face was found. Draw a looser box with some space around the head, or move closer."); }
       catch { setStatus("Could not analyze that selection. Try again."); }
       finally { setBusy(false); }
     }} />

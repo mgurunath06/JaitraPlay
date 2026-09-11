@@ -46,12 +46,6 @@ APP_CATALOG = (
         "icon": "🐘",
     },
     {
-        "activity_id": "colours_shapes",
-        "title": "Colour Quest",
-        "description": "Explore colours, shapes and room treasure hunts.",
-        "icon": "🎨",
-    },
-    {
         "activity_id": "memory_cards",
         "title": "Memory Match",
         "description": "Turn over cards and find every pair.",
@@ -59,8 +53,8 @@ APP_CATALOG = (
     },
     {
         "activity_id": "riddle_guess",
-        "title": "Riddle Garden",
-        "description": "Listen to clues and discover the answer.",
+        "title": "Riddle & Discovery Garden",
+        "description": "Solve riddles and explore colours, geography and maps.",
         "icon": "🌱",
     },
     {
@@ -141,6 +135,9 @@ class CoreRuntime:
     def start_background_services(self) -> None:
         if self.health.ready:
             self.provider_availability.start()
+
+    def note_activity(self) -> None:
+        self.provider_availability.note_activity()
 
     def stop(self) -> None:
         self.provider_availability.stop()

@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen, cleanup } from "@testing-library/react"
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { coreClient } from "../app/coreClient";
 import { VoiceAnswer } from "./VoiceAnswer";
-import { matchAnswer, recognitionPhrases } from "./match";
+import { matchAnswer, matchChoiceNumber, recognitionPhrases } from "./match";
 import { encodePcm, recordVoice } from "./record";
 import type * as RecordingModule from "./record";
 vi.mock("./record", async (original) => ({ ...await original<typeof RecordingModule>(), recordVoice: vi.fn() }));
@@ -21,6 +21,9 @@ describe("voice answers", () => {
     expect(matchAnswer("blueberry", choices)).toBeNull();
     expect(matchAnswer("", choices)).toBeNull();
     expect(recognitionPhrases(choices)).toEqual(["blue", "red", "3", "three"]);
+    expect(recognitionPhrases(choices, true)).toContain("option two");
+    expect(matchChoiceNumber("I choose option two", choices)).toBe("red");
+    expect(matchChoiceNumber("1", choices)).toBe("blue");
   });
   it("encodes bounded little-endian PCM", () => {
     const audio = atob(encodePcm([new Float32Array([-1, 0, 1, 1])], 3));

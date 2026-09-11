@@ -5,7 +5,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
-from jaitra_core.providers.healthcheck import NoRedirect, check_directory, probe
+from jaitra_core.providers.healthcheck import NoRedirect, check_directory, probe, should_probe
 
 
 def profile(tmp_path: Path, host: str = "https://api.example.test") -> Path:
@@ -69,6 +69,17 @@ def test_invalid_responses_fail(tmp_path: Path, body: bytes) -> None:
 
 def test_no_profiles_is_unhealthy(tmp_path: Path) -> None:
     assert check_directory(tmp_path)["healthy"] is False
+
+
+def test_scheduled_probe_requires_recent_activity_and_stops_when_healthy(tmp_path: Path) -> None:
+    activity = tmp_path / "app-activity"
+    status = tmp_path / "question-provider-status.json"
+    assert should_probe(activity, status) is False
+    activity.touch()
+    assert should_probe(activity, status, activity.stat().st_mtime + 299) is True
+    assert should_probe(activity, status, activity.stat().st_mtime + 301) is False
+    status.write_text('{"available":true}')
+    assert should_probe(activity, status, activity.stat().st_mtime + 1) is False
 
 
 def test_timeout_is_reported(tmp_path: Path) -> None:
