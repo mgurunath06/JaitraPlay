@@ -7,6 +7,7 @@ import { PersonTracker, distance, type Person } from "./tracker";
 import type { IdentityProfile } from "./types";
 
 import { ExperimentLog, measuredFaces } from "./experiment";
+import { PeoplePanel } from "./PeoplePanel";
 import { ExperimentPanel } from "./ExperimentPanel";
 import type { FaceObservation } from "./faces";
 
@@ -15,6 +16,7 @@ type PersonLabel = "Jaitra" | "Father" | "Mother" | "Other";
 const personLabelOptions: PersonLabel[] = ["Jaitra", "Father", "Mother", "Other"];
 const prompts = ["Look towards the camera", "Keep looking towards the camera", "Turn your face slightly left", "Hold that gentle left turn", "Turn your face slightly right", "Hold that gentle right turn"];
 export function IdentityRoom({ open, paused, quiet, onClose }: { open: boolean; paused: boolean; quiet: boolean; onClose: () => void }) {
+  const analysisFrame = useRef<HTMLCanvasElement | null>(null);
   const video = useRef<HTMLVideoElement>(null);
   const experiment = useRef(new ExperimentLog());
   const tracker = useRef(new PersonTracker());
@@ -27,6 +29,7 @@ export function IdentityRoom({ open, paused, quiet, onClose }: { open: boolean; 
   const [deviceId, setDeviceId] = useState(readSettings().cameraId);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("Loading Jaitra’s profile…");
+  const [namedTracks, setNamedTracks] = useState<Record<number, string>>({});
   const [people, setPeople] = useState<Person[]>([]);
   const [personLabels, setPersonLabels] = useState<Record<number, PersonLabel>>({});
   const personLabelsRef = useRef<Record<number, PersonLabel>>({});
@@ -76,7 +79,7 @@ export function IdentityRoom({ open, paused, quiet, onClose }: { open: boolean; 
     let frameTimestamp = "";
     let lastVideoTime = -1;
     let lastFrameAt = performance.now();
-    const canvas = document.createElement("canvas"); canvas.width = 640; canvas.height = 480;
+    const canvas = document.createElement("canvas"); analysisFrame.current = canvas; canvas.width = 640; canvas.height = 480;
     const cleanup = () => {
       window.clearTimeout(timer); window.clearTimeout(watchdog);
       stream?.getTracks().forEach(t => t.stop()); worker?.terminate();
@@ -256,8 +259,8 @@ export function IdentityRoom({ open, paused, quiet, onClose }: { open: boolean; 
       <button disabled={!loaded || busy} onClick={() => { setEnabled(v => !v); setError(""); }}>{enabled ? "Pause recognition" : "Start recognition"}</button>
       <div className="identity-preview">
         <video ref={video} muted playsInline aria-label="Jaitra enrollment camera" />
-        {people.map(p => {
-          const name = personLabels[p.id] ?? `Person ${p.id}`;
+        {people.filter(p => phase !== "idle" || p.id === selected || namedTracks[p.id]).map(p => {
+          const name = namedTracks[p.id] ?? personLabels[p.id] ?? `Person ${p.id}`;
           const suffix = highlighted === p.id ? phase === "idle" ? " · face match: Jaitra" : " · selected for enrollment" : "";
           return <span key={p.id} className={highlighted === p.id ? "identity-label selected" : "identity-label"} style={{ left: `${(1 - p.x) * 100}%`, top: `${p.y * 100}%` }}>{name}{suffix}</span>;
         })}
@@ -284,6 +287,7 @@ export function IdentityRoom({ open, paused, quiet, onClose }: { open: boolean; 
       {phase !== "idle" && <button disabled={busy} onClick={() => { samples.current = []; candidate.current = null; changePhase("idle"); }}>Cancel enrollment</button>}
       {saved && phase === "idle" && <button disabled={busy} onClick={() => setDeleteConfirm(true)}>Forget Jaitra</button>}
       {deleteConfirm && <div><p>Delete Jaitra’s saved recognition profile from this device?</p><button disabled={busy} onClick={() => void forget()}>Yes, delete profile</button><button disabled={busy} onClick={() => setDeleteConfirm(false)}>Keep profile</button></div>}
+      <PeoplePanel people={people} running={running} video={video} frame={analysisFrame} childProfile={profile.current} onNamedTracks={setNamedTracks} />
       <ExperimentPanel video={video} log={experiment.current} profile={profile} />
       <p>A back-only view may need a hand-raise confirmation. The saved profile is never changed by that confirmation.</p>
     </div>

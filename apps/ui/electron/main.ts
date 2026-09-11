@@ -94,6 +94,17 @@ function installIpcHandlers(): void {
     }
     trace(name, safe);
   });
+  ipcMain.handle("jaitra:people", (event, action: unknown, payload: unknown) => {
+    if (event.sender !== mainWindow?.webContents || event.senderFrame !== mainWindow.webContents.mainFrame) throw new Error("Unknown sender");
+    if (action !== "get" && action !== "save" && action !== "delete") throw new Error("Invalid operation");
+    if (action === "delete" && (typeof payload !== "string" || !/^[a-zA-Z0-9-]{1,64}$/.test(payload))) throw new Error("Invalid ID");
+    const body = action === "save" ? JSON.stringify(payload) : undefined;
+    if (action === "save" && (!body || body.length > 200000)) throw new Error("Invalid profile");
+    return coreRequest(`/api/v1/identity/people${action === "delete" ? `/${payload}` : ""}`, {
+      method: action === "get" ? "GET" : action === "save" ? "PUT" : "DELETE",
+      headers: { "Content-Type": "application/json" }, body,
+    });
+  });
   ipcMain.handle("jaitra:identity", (event, action: unknown, profile: unknown) => {
     if (event.sender !== mainWindow?.webContents || event.senderFrame !== mainWindow.webContents.mainFrame) throw new Error("Unknown sender");
     if (action !== "get" && action !== "save" && action !== "delete") throw new Error("Invalid identity operation");

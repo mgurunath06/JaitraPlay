@@ -86,7 +86,7 @@ it("lets a parent label visible tracks without changing the saved profile", asyn
   fireEvent.click(screen.getByRole("button", { name: "Start recognition" })); await flush();
   await frame();
   fireEvent.click(screen.getByRole("button", { name: "Label Person 1 as Father" }));
-  expect(screen.getByText("Father", { selector: ".identity-label" })).toBeVisible();
+  expect(screen.getByText("Father", { selector: ".identity-person-labels strong" })).toBeVisible();
   expect(screen.getByRole("button", { name: "Label Person 1 as Father" })).toHaveAttribute("aria-pressed", "true");
   expect(identityRequest).toHaveBeenCalledTimes(1);
 });

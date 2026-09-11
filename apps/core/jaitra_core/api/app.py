@@ -18,7 +18,7 @@ from jaitra_core.api.models import (
     StorybookCreateRequest,
     TranscriptionRequest,
 )
-from jaitra_core.identity import IdentityProfile
+from jaitra_core.identity import IdentityProfile, PersonProfile
 from jaitra_core.observability.logging import log_event, request_id
 from jaitra_core.providers import QuestionGenerationError, StorybookNotFound
 from jaitra_core.runtime import CoreRuntime
@@ -82,6 +82,26 @@ def create_app(runtime: CoreRuntime, *, manage_lifecycle: bool = True) -> FastAP
     @app.delete("/api/v1/identity/jaitra")
     async def delete_identity() -> dict[str, bool]:
         await asyncio.to_thread(runtime.identity.delete)
+        return {"deleted": True}
+
+    @app.get("/api/v1/identity/people")
+    async def get_people() -> list[PersonProfile]:
+        try:
+            return await asyncio.to_thread(runtime.people.read)
+        except RuntimeError:
+            raise HTTPException(503, "PEOPLE_PROFILES_UNREADABLE") from None
+
+    @app.put("/api/v1/identity/people")
+    async def save_person(profile: PersonProfile) -> dict[str, bool]:
+        await asyncio.to_thread(runtime.people.save, profile)
+        return {"saved": True}
+
+    @app.delete("/api/v1/identity/people/{person_id}")
+    async def delete_person(person_id: str) -> dict[str, bool]:
+        try:
+            await asyncio.to_thread(runtime.people.delete, person_id)
+        except ValueError:
+            raise HTTPException(422, "Invalid person ID") from None
         return {"deleted": True}
 
     @app.post("/api/v1/voice/transcribe")

@@ -71,3 +71,62 @@ def test_identity_api_restart_and_validation(config: AppConfig, repository_root:
             assert (await client.get("/api/v1/identity/jaitra")).json() is None
 
     anyio.run(exercise)
+
+
+def test_people_persist_independently_and_can_add_views(tmp_path: Path) -> None:
+    from jaitra_core.identity import PeopleStore, PersonProfile
+
+    store = PeopleStore(tmp_path)
+    dad = PersonProfile(
+        id="dad", name="Dad", relationship="father", descriptors=profile().descriptors
+    )
+    mom = PersonProfile(
+        id="mom", name="Mom", relationship="mother", descriptors=profile().descriptors
+    )
+    store.save(dad)
+    store.save(mom)
+    assert len(PeopleStore(tmp_path).read()) == 2
+    dad.descriptors *= 3
+    store.save(dad)
+    assert len(PeopleStore(tmp_path).read()[0].descriptors) == 18
+    store.delete("dad")
+    assert store.read() == [mom]
+    with pytest.raises(ValueError):
+        store.delete("../jaitra")
+    with pytest.raises(ValidationError):
+        PersonProfile(
+            id="../escape", name="Dad", relationship="father", descriptors=profile().descriptors
+        )
+
+
+def test_people_api(config: AppConfig, repository_root: Path) -> None:
+    runtime = CoreRuntime(config, repository_root=repository_root)
+
+    async def exercise() -> None:
+        async with AsyncClient(
+            transport=ASGITransport(app=create_app(runtime, manage_lifecycle=False)),
+            base_url="http://test",
+        ) as client:
+            payload = {
+                **profile().model_dump(),
+                "id": "dad",
+                "name": "Arun",
+                "relationship": "father",
+            }
+            assert (await client.put("/api/v1/identity/people", json=payload)).status_code == 200
+            assert (await client.get("/api/v1/identity/people")).json() == [payload]
+            assert (await client.get("/api/v1/identity/jaitra")).json() is None
+            assert (await client.delete("/api/v1/identity/people/dad")).status_code == 200
+            assert (await client.get("/api/v1/identity/people")).json() == []
+
+    anyio.run(exercise)
+
+
+def test_single_view_person_is_valid_but_malformed_descriptors_are_not() -> None:
+    from jaitra_core.identity import PersonProfile
+
+    fields = {"id": "dad", "name": "Arun", "relationship": "father"}
+    assert len(PersonProfile(**fields, descriptors=[[0.1] * 128]).descriptors) == 1
+    for descriptors in ([], [[0.1] * 127], [[float("nan")] * 128], [[0.0] * 128]):
+        with pytest.raises(ValidationError):
+            PersonProfile(**fields, descriptors=descriptors)

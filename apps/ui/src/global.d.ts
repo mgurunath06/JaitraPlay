@@ -5,6 +5,7 @@ declare global {
   interface Window {
     jaitra?: {
       diagnostic?(event: string, data: Record<string, string | number | boolean>): void;
+      people?(action: "get" | "save" | "delete", payload?: unknown): Promise<unknown>;
       identity(action: "get" | "save" | "delete", profile?: IdentityProfile): Promise<IdentityProfile | null | { saved?: boolean; deleted?: boolean }>;
       quit(): Promise<void>;
       transcribe(request: { audio: string; sampleRate: number; phrases?: string[] }): Promise<{ text: string }>;

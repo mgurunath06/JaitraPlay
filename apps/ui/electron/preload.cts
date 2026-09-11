@@ -9,6 +9,7 @@ interface QuestionRequest {
 
 contextBridge.exposeInMainWorld("jaitra", {
   diagnostic: (event: string, data: Record<string, string | number | boolean>) => ipcRenderer.send("jaitra:diagnostic", event, data),
+  people: (action: "get" | "save" | "delete", payload?: unknown) => ipcRenderer.invoke("jaitra:people", action, payload),
   identity: (action: "get" | "save" | "delete", profile?: unknown) => ipcRenderer.invoke("jaitra:identity", action, profile),
   transcribe: (request: { audio: string; sampleRate: number; phrases?: string[] }) => ipcRenderer.invoke("jaitra:transcribe", request),
   quit: () => ipcRenderer.invoke("jaitra:quit"),

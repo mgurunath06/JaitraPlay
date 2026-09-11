@@ -22,7 +22,7 @@ from jaitra_core.api.models import (
 )
 from jaitra_core.config import AppConfig
 from jaitra_core.content import ContentCatalog
-from jaitra_core.identity import IdentityStore
+from jaitra_core.identity import IdentityStore, PeopleStore
 from jaitra_core.observability import ComponentHealth, HealthModel, HealthState, log_event
 from jaitra_core.persistence import Database
 from jaitra_core.providers import (
@@ -82,6 +82,7 @@ class CoreRuntime:
         self.state_machine = StateMachine()
         state_dir = self._resolve(config.paths.state_dir)
         self.identity = IdentityStore(state_dir)
+        self.people = PeopleStore(state_dir)
         self.database = Database(
             state_dir / "jaitra.db", self._resolve(config.paths.migrations_dir)
         )

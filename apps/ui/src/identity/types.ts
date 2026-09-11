@@ -4,3 +4,9 @@ export interface IdentityProfile {
   name: "Jaitra";
   descriptors: number[][];
 }
+
+export interface PersonProfile extends Omit<IdentityProfile, "name"> {
+  id: string;
+  name: string;
+  relationship: "father" | "mother" | "sibling" | "grandparent" | "relative" | "friend" | "caregiver" | "other";
+}

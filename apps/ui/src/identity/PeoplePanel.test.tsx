@@ -1,0 +1,80 @@
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { PeoplePanel } from "./PeoplePanel";
+import { peopleRequest } from "./people";
+import type * as PeopleModule from "./people";
+import type { PersonProfile } from "./types";
+import type { Person } from "./tracker";
+vi.mock("./people", async importOriginal => ({ ...await importOriginal<typeof PeopleModule>(), peopleRequest: vi.fn() }));
+const dad: PersonProfile = { id: "dad", name: "Arun", relationship: "father", version: 1, model: "face-api-1.7.15-recognition", descriptors: [Array(128).fill(0.1)] };
+const person = (value = 0.1, id = 1): Person => ({ id, pose: [], x: 0.5, y: 0.5, raised: false, raisedSince: 0, lowered: true, matches: 0, face: { x: 0.2, y: 0.2, width: 0.2, height: 0.2, descriptor: Array(128).fill(value) } });
+const onNamedTracks = vi.fn();
+let frame: { current: HTMLCanvasElement };
+let video: { current: HTMLVideoElement };
+beforeEach(() => {
+  frame = { current: document.createElement("canvas") }; video = { current: document.createElement("video") };
+  vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockImplementation((() => ({ drawImage: vi.fn() })) as unknown as typeof HTMLCanvasElement.prototype.getContext);
+  vi.spyOn(HTMLCanvasElement.prototype, "toDataURL").mockReturnValue("data:image/jpeg;base64,face");
+  vi.mocked(peopleRequest).mockResolvedValue([]);
+});
+afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.clearAllMocks(); });
+const panel = (people: Person[]) => <PeoplePanel people={people} running video={video} frame={frame} onNamedTracks={onNamedTracks} />;
+it("holds an unknown face still while naming and saves the original captured descriptor", async () => {
+  const view = render(panel([person()]));
+  await screen.findByAltText("Captured face awaiting a name");
+  fireEvent.change(screen.getByLabelText("Name"), { target: { value: "Arun" } });
+  view.rerender(panel([person(0.3)]));
+  expect(screen.getByLabelText("Name")).toHaveValue("Arun");
+  fireEvent.click(screen.getByText("Save person and relationship"));
+  await waitFor(() => expect(peopleRequest).toHaveBeenCalledWith("save", expect.objectContaining({ name: "Arun", relationship: "father", descriptors: [Array(128).fill(0.1)] })));
+});
+it("shows uncertain similarity and lets a human approve the existing identity", async () => {
+  vi.mocked(peopleRequest).mockResolvedValue([dad]);
+  render(panel([person(0.14)]));
+  await screen.findByAltText("Captured face awaiting a name");
+  expect(screen.getByText(/% estimated match confidence: Arun/)).toBeVisible();
+  fireEvent.click(screen.getByText("Approve: this is Arun"));
+  await waitFor(() => expect(peopleRequest).toHaveBeenCalledWith("save", expect.objectContaining({ id: "dad", descriptors: [dad.descriptors[0], Array(128).fill(0.14)] })));
+});
+it("can correct a suggestion to another saved person without losing the captured face", async () => {
+  const mom = { ...dad, id: "mom", name: "Meera", relationship: "mother" as const };
+  vi.mocked(peopleRequest).mockResolvedValue([dad, mom]);
+  render(panel([person(0.14)]));
+  await screen.findByAltText("Captured face awaiting a name");
+  fireEvent.change(screen.getByLabelText("Correct identity"), { target: { value: "mom" } });
+  fireEvent.click(screen.getByText("Save person and relationship"));
+  await waitFor(() => expect(peopleRequest).toHaveBeenCalledWith("save", expect.objectContaining({ id: "mom", name: "Meera", relationship: "mother", descriptors: [dad.descriptors[0], Array(128).fill(0.14)] })));
+});
+it("does not use rejected detections or duplicate identities for relationship prompts", async () => {
+  vi.mocked(peopleRequest).mockResolvedValue([dad]);
+  const view = render(panel([person(0.14)]));
+  await screen.findByAltText("Captured face awaiting a name");
+  fireEvent.click(screen.getByText("Not a person / discard face"));
+  expect(screen.queryByAltText("Captured face awaiting a name")).not.toBeInTheDocument();
+  expect(peopleRequest).toHaveBeenCalledTimes(1);
+  view.rerender(panel([person(0.1, 2), person(0.1, 3)]));
+  view.rerender(panel([person(0.1, 2), person(0.1, 3)]));
+  view.rerender(panel([person(0.1, 2), person(0.1, 3)]));
+  expect(screen.getByText("Say “Jaitra, go to Father”")).toBeDisabled();
+  expect(screen.queryByLabelText("Live face: Arun")).not.toBeInTheDocument();
+});
+it("queues new faces while the first still is being named", async () => {
+  const view = render(panel([person()]));
+  await screen.findByAltText("Captured face awaiting a name");
+  fireEvent.change(screen.getByLabelText("Name"), { target: { value: "Arun" } });
+  view.rerender(panel([person(), person(0.3, 2)]));
+  await screen.findByAltText("Queued face from track 2");
+  expect(screen.getByLabelText("Name")).toHaveValue("Arun");
+  fireEvent.click(screen.getByText("Skip this face"));
+  await waitFor(() => expect(screen.queryByAltText("Queued face from track 2")).not.toBeInTheDocument());
+  expect(screen.getByAltText("Captured face awaiting a name")).toBeVisible();
+  expect(screen.getByLabelText("Name")).toHaveValue("");
+});
+it("puts a manually corrected name on the live track immediately", async () => {
+  vi.mocked(peopleRequest).mockResolvedValue([dad]);
+  render(panel([person(0.18)]));
+  await screen.findByAltText("Captured face awaiting a name");
+  fireEvent.click(screen.getByText("Approve: this is Arun"));
+  await waitFor(() => expect(onNamedTracks).toHaveBeenLastCalledWith({ 1: "Arun" }));
+  expect(screen.getByText("Say “Jaitra, go to Father”")).toBeEnabled();
+});

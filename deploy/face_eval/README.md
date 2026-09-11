@@ -85,3 +85,43 @@ Prediction-to-label association is greedy descending IoU with a 0.3 cutoff and o
 These first measurements are face-level. Live logs include existing tracker decisions, but the scorer does not yet measure body identity switches or time-spread track voting. Geometry changes, temporal aggregation, threshold deployment, and the setup wizard follow the baseline evidence.
 
 For a separate historical-photo experiment, pass `--secondary-photos /path/to/parent-confirmed-child-only-photos` and write a different predictions file. The runner requires exactly one detected face per image and records the additional gallery size. Use only photos confirmed by the parent, keep them out of held-out sessions, and compare calibration/test results with the primary-only run. No family photos have been accessed or enrolled by these tools.
+
+## People and relationships (live enrollment)
+
+In **Remember Jaitra → People and relationships**, start recognition. An unknown
+face is held as a still crop while you enter its name and relationship to Jaitra.
+Save it, skip it, or reject it as not a person. The crop is held in memory only;
+the saved profile contains facial descriptors, name, relationship, and a stable ID.
+The full live video keeps running above the review section. Saved names appear
+on matched tracks in that video; unknown tracks remain unnamed. Additional face
+crops wait in a review queue (up to 20), so you can finish naming one while the
+camera continues. Recognized people also have labelled live face crops.
+
+One captured face can start a profile. Select an existing saved person to add
+clear views from different angles and distances (up to 48 retained views).
+Single-view matching uses a stricter distance limit; multiple varied views are
+recommended. Recognition requires three matching processed observations and
+rejects close competing matches. These thresholds still need household evaluation.
+Use **Mark a missed face** to freeze a source frame and drag around one face;
+the crop must produce exactly one detectable face before it can be enrolled.
+**Not a person / ignore** suppresses that track in family recognition, not the
+underlying detector; a newly numbered track may need another correction.
+
+Profiles persist in the core state directory under `identity/people/`, separate
+from the existing `identity/jaitra.json`. An independent enrollment UI can use
+`GET/PUT /api/v1/identity/people` and `DELETE /api/v1/identity/people/{id}` to share
+this same data. PUT accepts `id`, `name`, `relationship`, `version: 1`,
+`model: "face-api-1.7.15-recognition"`, and `descriptors` (1–48 arrays of 128 floats).
+Relationships: father, mother, sibling, grandparent, relative, friend, caregiver, other.
+
+The UI publishes recognized people via `jaitra:people` with ID, name, relationship,
+and track ID, clearing the list on recognition loss. The explicit **Say “Jaitra,
+go to Father”** button is enabled only for one recognized father. Automatic game
+instructions based on relationships are not yet wired into activities.
+
+Uncertain face cards show the closest saved name and an **estimated match
+confidence** percentage, with **Approve** and **Correct identity** controls.
+The display score is `100 × clamp(1 − mean top-three descriptor distance / √2)`;
+it is a similarity estimate, not a calibrated probability. Approval or correction
+adds the captured view to the chosen saved profile. Neither guesses nor ordinary
+live matches automatically modify a profile.
