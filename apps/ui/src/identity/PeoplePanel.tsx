@@ -117,18 +117,10 @@ export function PeoplePanel({ people, running, video, frame, childProfile, onNam
     catch { setStatus("Save failed. Your captured views are still here; retry."); }
     finally { setBusy(false); }
   };
-  const namedViews = Object.entries(recognized).map(([trackId, profile]) => ({ person: people.find(p => p.id === Number(trackId)), profile }));
   const father = Object.values(recognized).filter(p => p.relationship === "father");
   return <fieldset className="people-panel" disabled={busy}>
-    <legend>People and relationships</legend>
-    <p>Unknown faces appear here as still images. Give the captured face a name and relationship, then save it. Add more varied views to improve recognition.</p>
-    {pending.length > 0 && <div aria-label="Faces waiting for review"><p>{pending.length} captured faces waiting for review. The live video continues.</p>{pending.map(p => <img key={p.trackId} src={p.portrait} alt={`Queued face from track ${p.trackId}`} width={96} />)}</div>}
-    {namedViews.map(({ person, profile }) => <figure key={profile.id}>
-      <canvas aria-label={`Live face: ${profile.name}`} width={240} height={240} ref={c => {
-        const v = frame.current, f = person?.face; if (c && v && f) c.getContext("2d")?.drawImage(v, f.x * v.width, f.y * v.height, f.width * v.width, f.height * v.height, 0, 0, 240, 240);
-      }} />
-      <figcaption>{profile.name} — Jaitra’s {profile.relationship}</figcaption>
-    </figure>)}
+    <legend>Frozen faces to name</legend>
+    <p>Each new face appears here while the live video keeps running. Name it and choose its relationship to Jaitra. After saving, its name appears on the tracked face in the video.</p>
     {portrait && <div><img src={portrait} alt="Captured face awaiting a name" style={{ width: 240, maxWidth: "100%" }} /><p>This still image stays here while you enter the name.</p>
       {suggestion && <div>
         <p>{suggestion.confidence}% estimated match confidence: {suggestion.profile.name} — {suggestion.profile.relationship}</p>
@@ -141,6 +133,7 @@ export function PeoplePanel({ people, running, video, frame, childProfile, onNam
       <button onClick={() => { if (selected !== null) setRejected(current => [...current, selected]); setPortrait(""); resetCapture(); setSelected(null); }}>Not a person / discard face</button>
       <button onClick={() => { setPortrait(""); resetCapture(); setSelected(null); }}>Skip this face</button>
     </div>}
+    {pending.length > 0 && <div aria-label="Faces waiting for review"><p>{pending.length} more captured {pending.length === 1 ? "face" : "faces"} waiting for review. The live video continues.</p>{pending.map(p => <img key={p.trackId} src={p.portrait} alt="Queued face awaiting review" width={96} />)}</div>}
     {!ready && <button onClick={() => void load()}>Retry loading people</button>}
     {!portrait && <label>Saved person <select value={editing} onChange={e => {
       const p = profiles.find(p => p.id === e.target.value); setEditing(p?.id ?? ""); setName(p?.name ?? ""); setRelationship(p?.relationship ?? "father"); resetCapture(); setSelected(null); setPortrait("");
@@ -148,7 +141,7 @@ export function PeoplePanel({ people, running, video, frame, childProfile, onNam
     <label>Name <input maxLength={64} value={name} onChange={e => setName(e.target.value)} /></label>
     <label>Relationship to Jaitra <select value={relationship} onChange={e => setRelationship(e.target.value as PersonProfile["relationship"])}>{relationships.map(r => <option key={r}>{r}</option>)}</select></label>
     {running && people.filter(p => recognized[p.id]).map(p => <div key={p.id}>
-      <button aria-pressed={selected === p.id} disabled={rejected.includes(p.id)} onClick={() => { setSelected(selected === p.id ? null : p.id); resetCapture(); }}>Select Person {p.id}{recognized[p.id] ? `: ${recognized[p.id].name} (${recognized[p.id].relationship})` : " — unconfirmed"}</button>
+      <button aria-pressed={selected === p.id} disabled={rejected.includes(p.id)} onClick={() => { setSelected(selected === p.id ? null : p.id); resetCapture(); }}>Select {recognized[p.id].name} ({recognized[p.id].relationship})</button>
       <button onClick={() => { setRejected(current => current.includes(p.id) ? current.filter(id => id !== p.id) : [...current, p.id]); if (selected === p.id) { setSelected(null); resetCapture(); } }}>{rejected.includes(p.id) ? "Restore selection" : "Not a person / ignore"}</button>
     </div>)}
     {rejected.length > 0 && <button onClick={() => { for (const id of rejected) reviewed.current.delete(id); setRejected([]); }}>Review ignored tracks again</button>}

@@ -245,10 +245,12 @@ body { overflow-y: auto; }
 .identity-preview video { width: 100%; display: block; transform: scaleX(-1); border-radius: 12px; }
 .identity-label { position: absolute; transform: translate(-50%, -50%); padding: 4px 8px; background: #10253fee; color: #fff; border-radius: 8px; font-size: 0.8rem; }
 .identity-label.selected { background: #08643c; outline: 3px solid #70f5ad; }
-.identity-person-labels { margin-top: 10px; border: 1px solid #b3ccd9; border-radius: 12px; }
-.identity-person-labels p { margin: 4px 0 8px; font-size: 0.9rem; }
-.identity-person-labels strong { display: inline-block; min-width: 90px; }
-.identity-person-labels button[aria-pressed="true"] { background: #08643c; color: #fff; }
+.identity-track-label { border: 2px solid #70f5ad; }
+.identity-face-box { position: absolute; box-sizing: border-box; border: 3px solid #52e69a; border-radius: 8px; pointer-events: none; }
+.identity-face-box.selected { border-color: #ffd966; box-shadow: 0 0 0 2px #10253f; }
+.identity-face-box > span { position: absolute; left: -3px; bottom: 100%; max-width: 220px; padding: 4px 8px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; background: #08643c; color: #fff; border-radius: 7px 7px 7px 0; font-size: 0.82rem; font-weight: 700; }
+.people-panel { margin-top: 12px; border: 2px solid #b3ccd9; border-radius: 12px; }
+.people-panel > legend { font-weight: 700; }
 .identity-room button { border: 1px solid #b3ccd9; border-radius: 10px; background: #edf5ff; color: #10253f; font: inherit; cursor: pointer; }
 .identity-room button:disabled { opacity: 0.5; cursor: default; }
 .identity-room button:focus-visible { outline: 3px solid #7056d7; outline-offset: 2px; }

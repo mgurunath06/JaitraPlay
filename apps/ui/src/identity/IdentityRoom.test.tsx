@@ -3,10 +3,13 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { IdentityRoom } from "./IdentityRoom";
 import { identityRequest } from "./client";
 import { detectFaces } from "./faces";
+import { peopleRequest } from "./people";
+import type * as PeopleModule from "./people";
 import type { Landmark } from "../camera/observe";
 import type { IdentityProfile } from "./types";
 vi.mock("./client", () => ({ identityRequest: vi.fn() }));
 vi.mock("./faces", () => ({ loadFaces: vi.fn().mockResolvedValue(undefined), detectFaces: vi.fn() }));
+vi.mock("./people", async importOriginal => ({ ...await importOriginal<typeof PeopleModule>(), peopleRequest: vi.fn() }));
 const pose = (raised = false): Landmark[] => {
   const p = Array.from({ length: 33 }, () => ({ x: 0.5, y: 0.7, visibility: 1 }));
   p[0].y = 0.2; p[11].y = p[12].y = 0.4; p[15].y = raised ? 0.1 : 0.7; return p;
@@ -24,12 +27,14 @@ beforeEach(() => {
   vi.useFakeTimers();
   workers.length = 0;
   vi.mocked(identityRequest).mockResolvedValue(null);
+  vi.mocked(peopleRequest).mockResolvedValue([]);
   vi.mocked(detectFaces).mockImplementation(async () => [{ x: 0.4, y: 0.1, width: 0.2, height: 0.2, descriptor: Array(128).fill(0.1) }]);
   vi.stubGlobal("Worker", FakeWorker);
   vi.stubGlobal("createImageBitmap", vi.fn().mockResolvedValue({ close: vi.fn() }));
   Object.defineProperty(navigator, "mediaDevices", { configurable: true, value: { getUserMedia: vi.fn().mockResolvedValue({ getTracks: () => [{ stop: stopTrack }], getVideoTracks: () => [{ addEventListener: vi.fn() }] }) } });
   vi.spyOn(HTMLMediaElement.prototype, "play").mockResolvedValue(undefined);
   vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockImplementation((() => ({ drawImage: vi.fn() })) as unknown as typeof HTMLCanvasElement.prototype.getContext);
+  vi.spyOn(HTMLCanvasElement.prototype, "toDataURL").mockReturnValue("data:image/jpeg;base64,face");
   vi.spyOn(HTMLVideoElement.prototype, "videoWidth", "get").mockReturnValue(640);
   vi.spyOn(HTMLVideoElement.prototype, "videoHeight", "get").mockReturnValue(480);
 });
@@ -80,13 +85,25 @@ it("does not start a camera when profile loading fails", async () => {
   expect(screen.getByRole("button", { name: "Start recognition" })).toBeDisabled();
   expect(navigator.mediaDevices.getUserMedia).not.toHaveBeenCalled();
 });
-it("lets a parent label visible tracks without changing the saved profile", async () => {
+it("does not put temporary Person numbers over unknown faces", async () => {
   render(<IdentityRoom open paused={false} quiet onClose={vi.fn()} />);
   await flush();
   fireEvent.click(screen.getByRole("button", { name: "Start recognition" })); await flush();
   await frame();
-  fireEvent.click(screen.getByRole("button", { name: "Label Person 1 as Father" }));
-  expect(screen.getByText("Father", { selector: ".identity-person-labels strong" })).toBeVisible();
-  expect(screen.getByRole("button", { name: "Label Person 1 as Father" })).toHaveAttribute("aria-pressed", "true");
+  expect(screen.queryByText("Who is in view?")).not.toBeInTheDocument();
+  expect(document.querySelector(".identity-preview")).not.toHaveTextContent("Person 1");
   expect(identityRequest).toHaveBeenCalledTimes(1);
+});
+it("shows a frozen unknown face and puts the saved name in a live face box", async () => {
+  render(<IdentityRoom open paused={false} quiet onClose={vi.fn()} />);
+  await flush();
+  fireEvent.click(screen.getByRole("button", { name: "Start recognition" })); await flush();
+  await frame();
+  await flush();
+  expect(screen.getByAltText("Captured face awaiting a name")).toBeVisible();
+  fireEvent.change(screen.getByLabelText("Name"), { target: { value: "Arun" } });
+  fireEvent.click(screen.getByRole("button", { name: "Save person and relationship" }));
+  await flush();
+  expect(screen.getByLabelText("Arun face track")).toBeVisible();
+  expect(screen.getByText("Camera on · Tracking Arun")).toBeVisible();
 });

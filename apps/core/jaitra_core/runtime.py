@@ -32,7 +32,7 @@ from jaitra_core.providers import (
     QuestionGenerationError,
     StorybookService,
 )
-from jaitra_core.providers.variety import repeats_question
+from jaitra_core.providers.variety import repeats_question, shuffle_question_choices
 from jaitra_core.state import StateMachine, TransitionError
 from jaitra_core.voice import VoiceService
 
@@ -198,6 +198,10 @@ class CoreRuntime:
                     question = self.question_bank.take(activity_id, history)
             else:
                 question = self.question_bank.take(activity_id, history)
+            # Stored local riddles deliberately keep a canonical order. Randomize at
+            # delivery so neither local nor provider questions reveal the answer by
+            # always placing it in the first button.
+            question = shuffle_question_choices(question)
             self.database.record_question(activity_id, question.model_dump_json(by_alias=True))
             return question
 

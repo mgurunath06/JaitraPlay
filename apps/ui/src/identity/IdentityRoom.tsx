@@ -12,8 +12,6 @@ import { ExperimentPanel } from "./ExperimentPanel";
 import type { FaceObservation } from "./faces";
 
 type Phase = "idle" | "choose" | "confirm" | "capture" | "review";
-type PersonLabel = "Jaitra" | "Father" | "Mother" | "Other";
-const personLabelOptions: PersonLabel[] = ["Jaitra", "Father", "Mother", "Other"];
 const prompts = ["Look towards the camera", "Keep looking towards the camera", "Turn your face slightly left", "Hold that gentle left turn", "Turn your face slightly right", "Hold that gentle right turn"];
 export function IdentityRoom({ open, paused, quiet, onClose }: { open: boolean; paused: boolean; quiet: boolean; onClose: () => void }) {
   const analysisFrame = useRef<HTMLCanvasElement | null>(null);
@@ -31,8 +29,6 @@ export function IdentityRoom({ open, paused, quiet, onClose }: { open: boolean; 
   const [message, setMessage] = useState("Loading Jaitra’s profile…");
   const [namedTracks, setNamedTracks] = useState<Record<number, string>>({});
   const [people, setPeople] = useState<Person[]>([]);
-  const [personLabels, setPersonLabels] = useState<Record<number, PersonLabel>>({});
-  const personLabelsRef = useRef<Record<number, PersonLabel>>({});
   const [selected, setSelected] = useState<number | null>(null);
   const [phase, setPhase] = useState<Phase>("idle");
   const phaseRef = useRef<Phase>("idle");
@@ -65,8 +61,7 @@ export function IdentityRoom({ open, paused, quiet, onClose }: { open: boolean; 
   }, []);
 
   useEffect(() => {
-    tracker.current.reset(); setPeople([]); setSelected(null); setRunning(false);
-    personLabelsRef.current = {}; setPersonLabels({});
+    tracker.current.reset(); setPeople([]); setSelected(null); setNamedTracks({}); setRunning(false);
     challenge.current = false; candidate.current = null; samples.current = []; setCount(0); changePhase("idle");
     window.dispatchEvent(new CustomEvent("jaitra:participant", { detail: null }));
     if (!enabled || paused || hidden || !loaded) return;
@@ -178,7 +173,7 @@ export function IdentityRoom({ open, paused, quiet, onClose }: { open: boolean; 
               latencyMs: performance.now() - frameStarted, faceLatencyMs, phase: phaseRef.current,
               faces: measuredFaces(observations, profile.current),
               people: current.map(p => ({ trackId: p.id, hasFace: !!p.face, matches: p.matches,
-                manualLabel: personLabelsRef.current[p.id] ?? "unlabelled" })),
+                manualLabel: "unlabelled" })),
               decision: engine.target === null ? "uncertain" : engine.source === "gesture" ? "gesture_selected" : "face_track_selected",
               target: engine.target, source: engine.source });
             timer = window.setTimeout(() => void send(), 200);
@@ -227,31 +222,9 @@ export function IdentityRoom({ open, paused, quiet, onClose }: { open: boolean; 
     finally { setBusy(false); }
   };
   const highlighted = phase === "idle" ? selected : candidate.current;
-  const labelPerson = (id: number, label: PersonLabel | null) => {
-    setPersonLabels(current => {
-      const next = { ...current };
-      if (label === null) delete next[id];
-      else {
-        // Named family labels identify one visible track; "Other" can label several people.
-        if (label !== "Other") {
-          for (const [trackId, assigned] of Object.entries(next)) {
-            if (assigned === label) delete next[Number(trackId)];
-          }
-        }
-        next[id] = label;
-      }
-      personLabelsRef.current = next;
-      return next;
-    });
-    experiment.current.add({ type: "manual_label", timestamp: new Date().toISOString(),
-      trackId: id, label: label ?? "unlabelled" });
-    if (label === "Jaitra" && phaseRef.current === "choose") {
-      candidate.current = id; changePhase("confirm");
-      announce("Please confirm that the selected person is Jaitra.");
-    }
-  };
+  const trackedNames = [...new Set(Object.values(namedTracks))];
   return <section className={`identity-room ${open ? "identity-open" : "identity-collapsed"}`} aria-label="Jaitra recognition">
-    <div className="identity-status" aria-live="polite">{error ? "Recognition needs attention — open Remember Jaitra" : running ? selected !== null ? "Camera on · Tracking Jaitra" : "Camera on · Looking for Jaitra" : saved ? "Jaitra recognition paused" : "Jaitra is not enrolled"}</div>
+    <div className="identity-status" aria-live="polite">{error ? "Recognition needs attention — open Remember Jaitra" : running ? selected !== null ? "Camera on · Tracking Jaitra" : trackedNames.length ? `Camera on · Tracking ${trackedNames.join(", ")}` : "Camera on · Looking for known people" : saved ? "Jaitra recognition paused" : "Jaitra is not enrolled"}</div>
     {!open && running && selected === null && saved && <p className="identity-prompt" aria-live="polite">{message}</p>}
     <div hidden={!open}>
       <header><h2>Remember Jaitra</h2><button onClick={onClose}>Close</button></header>
@@ -259,25 +232,22 @@ export function IdentityRoom({ open, paused, quiet, onClose }: { open: boolean; 
       <button disabled={!loaded || busy} onClick={() => { setEnabled(v => !v); setError(""); }}>{enabled ? "Pause recognition" : "Start recognition"}</button>
       <div className="identity-preview">
         <video ref={video} muted playsInline aria-label="Jaitra enrollment camera" />
-        {people.filter(p => phase !== "idle" || p.id === selected || namedTracks[p.id]).map(p => {
-          const name = namedTracks[p.id] ?? personLabels[p.id] ?? `Person ${p.id}`;
-          const suffix = highlighted === p.id ? phase === "idle" ? " · face match: Jaitra" : " · selected for enrollment" : "";
-          return <span key={p.id} className={highlighted === p.id ? "identity-label selected" : "identity-label"} style={{ left: `${(1 - p.x) * 100}%`, top: `${p.y * 100}%` }}>{name}{suffix}</span>;
+        {people.map(person => {
+          const name = namedTracks[person.id] ?? (person.id === highlighted ? "Jaitra" : "");
+          if (!name) return null;
+          const suffix = person.id === highlighted && phase !== "idle" ? " · selected for enrollment" : "";
+          if (!person.face) return <span key={person.id} className="identity-label identity-track-label"
+            aria-label={`${name} tracked; face temporarily hidden`}
+            style={{ left: `${(1 - person.x) * 100}%`, top: `${person.y * 100}%` }}>{name} · tracking</span>;
+          const face = person.face;
+          return <span key={person.id} className={person.id === highlighted ? "identity-face-box selected" : "identity-face-box"}
+            aria-label={`${name} face track`}
+            style={{ left: `${(1 - face.x - face.width) * 100}%`, top: `${face.y * 100}%`, width: `${face.width * 100}%`, height: `${face.height * 100}%` }}>
+            <span>{name}{suffix}</span>
+          </span>;
         })}
       </div>
-      {running && people.length > 0 && <fieldset className="identity-person-labels">
-        <legend>Who is in view?</legend>
-        <p>Choose the name shown over each person. Labels follow the current camera track and do not change face recognition or save a face profile.</p>
-        {people.map(person => <div key={person.id}>
-          <strong>{personLabels[person.id] ?? `Person ${person.id}`}</strong>
-          {personLabelOptions.map(label => <button key={label} type="button"
-            aria-label={`Label Person ${person.id} as ${label}`}
-            aria-pressed={personLabels[person.id] === label}
-            onClick={() => labelPerson(person.id, label)}>{label}</button>)}
-          {personLabels[person.id] && <button type="button" aria-label={`Clear label for Person ${person.id}`}
-            onClick={() => labelPerson(person.id, null)}>Clear</button>}
-        </div>)}
-      </fieldset>}
+      <PeoplePanel people={people} running={running && phase === "idle"} video={video} frame={analysisFrame} childProfile={profile.current} onNamedTracks={setNamedTracks} />
       <p role="status">{message}</p>
       {error && <p role="alert">{error}</p>}
       {phase === "idle" && <button disabled={!running || busy} onClick={begin}>{saved ? "Enroll Jaitra again" : "Enroll Jaitra"}</button>}
@@ -287,7 +257,6 @@ export function IdentityRoom({ open, paused, quiet, onClose }: { open: boolean; 
       {phase !== "idle" && <button disabled={busy} onClick={() => { samples.current = []; candidate.current = null; changePhase("idle"); }}>Cancel enrollment</button>}
       {saved && phase === "idle" && <button disabled={busy} onClick={() => setDeleteConfirm(true)}>Forget Jaitra</button>}
       {deleteConfirm && <div><p>Delete Jaitra’s saved recognition profile from this device?</p><button disabled={busy} onClick={() => void forget()}>Yes, delete profile</button><button disabled={busy} onClick={() => setDeleteConfirm(false)}>Keep profile</button></div>}
-      <PeoplePanel people={people} running={running} video={video} frame={analysisFrame} childProfile={profile.current} onNamedTracks={setNamedTracks} />
       <ExperimentPanel video={video} log={experiment.current} profile={profile} />
       <p>A back-only view may need a hand-raise confirmation. The saved profile is never changed by that confirmation.</p>
     </div>

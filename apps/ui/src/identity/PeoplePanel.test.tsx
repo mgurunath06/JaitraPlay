@@ -63,10 +63,10 @@ it("queues new faces while the first still is being named", async () => {
   await screen.findByAltText("Captured face awaiting a name");
   fireEvent.change(screen.getByLabelText("Name"), { target: { value: "Arun" } });
   view.rerender(panel([person(), person(0.3, 2)]));
-  await screen.findByAltText("Queued face from track 2");
+  await screen.findByAltText("Queued face awaiting review");
   expect(screen.getByLabelText("Name")).toHaveValue("Arun");
   fireEvent.click(screen.getByText("Skip this face"));
-  await waitFor(() => expect(screen.queryByAltText("Queued face from track 2")).not.toBeInTheDocument());
+  await waitFor(() => expect(screen.queryByAltText("Queued face awaiting review")).not.toBeInTheDocument());
   expect(screen.getByAltText("Captured face awaiting a name")).toBeVisible();
   expect(screen.getByLabelText("Name")).toHaveValue("");
 });

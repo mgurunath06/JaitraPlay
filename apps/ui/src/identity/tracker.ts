@@ -50,14 +50,23 @@ export class PersonTracker {
         x: face.x + face.width / 2, y: face.y + face.height / 2 });
     }
     const previous = this.recent.filter(track => now - track.lastSeen <= 2400);
-    const links = candidates.map(p => previous.filter(track => {
+    const faceLinks = candidates.map(p => previous.filter(track => p.face && track.person.face &&
+      distance(p.face.descriptor, track.person.face.descriptor) < 0.38));
+    const spatialLinks = candidates.map(p => previous.filter(track => {
       const elapsed = Math.max(0, now - track.lastSeen);
-      const allowed = 0.12 + Math.min(0.12, elapsed / 10000);
+      const allowed = 0.18 + Math.min(0.12, elapsed / 10000);
       return Math.hypot(p.x - track.person.x, p.y - track.person.y) < allowed;
     }));
     const next = candidates.map((p, i): Person => {
-      const linked = links[i];
-      const oldTrack = linked.length === 1 && links.filter(items => items.includes(linked[0])).length === 1 ? linked[0] : undefined;
+      // A clear face match survives larger motion between processed frames. Only use
+      // it when it is unique in both directions, then fall back to spatial motion.
+      // This avoids allocating Person 2, Person 3, ... for one moving person without
+      // transferring an ID during an ambiguous multi-person crossing.
+      const facial = faceLinks[i];
+      const faceTrack = facial.length === 1 && faceLinks.filter(items => items.includes(facial[0])).length === 1 ? facial[0] : undefined;
+      const spatial = spatialLinks[i];
+      const spatialTrack = spatial.length === 1 && spatialLinks.filter(items => items.includes(spatial[0])).length === 1 ? spatial[0] : undefined;
+      const oldTrack = faceTrack ?? spatialTrack;
       const old = oldTrack?.person;
       const raised = [15, 16].some((w, j) => handRaised(p.pose, w, 11 + j));
       const face = p.face;

@@ -43,6 +43,21 @@ describe("persistent identity matching and session tracking", () => {
     expect(t.people[0].pose).toHaveLength(0);
     t.update([pose()], [face()], 1800, null); expect(t.people[0].id).toBe(id);
   });
+  it("keeps the same track number when one clearly matching face moves across the frame", () => {
+    const t = new PersonTracker();
+    t.update([pose(0.2)], [face(0.2)], 0, null);
+    const id = t.people[0].id;
+    t.update([pose(0.75)], [face(0.75)], 200, null);
+    expect(t.people).toHaveLength(1);
+    expect(t.people[0].id).toBe(id);
+  });
+  it("does not use face continuity when two prior tracks are equally plausible", () => {
+    const t = new PersonTracker();
+    t.update([pose(0.2), pose(0.8)], [face(0.2), face(0.8)], 0, null);
+    const oldIds = t.people.map(p => p.id);
+    t.update([pose(0.5)], [face(0.5)], 200, null);
+    expect(oldIds).not.toContain(t.people[0].id);
+  });
   it("creates a new track after the retention window expires", () => {
     const t = new PersonTracker();
     t.update([pose()], [face()], 0, null);

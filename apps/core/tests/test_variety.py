@@ -1,11 +1,17 @@
 import json
+import random
 from pathlib import Path
 
 import anyio
 from jaitra_core.api.models import GeneratedQuestion, QuestionRequest
 from jaitra_core.config import AppConfig
 from jaitra_core.providers import QuestionGenerationError
-from jaitra_core.providers.variety import local_question, repeats_question
+from jaitra_core.providers.variety import (
+    local_question,
+    local_question_candidates,
+    repeats_question,
+    shuffle_question_choices,
+)
 from jaitra_core.runtime import CoreRuntime
 
 
@@ -27,6 +33,17 @@ def test_reworded_same_target_is_rejected_across_games() -> None:
     first = local_question("picture_guess", [])
     reworded = first.model_copy(update={"activity_id": "riddle_guess", "prompt": "Who am I?"})
     assert repeats_question(reworded, [first], [first.prompt])
+
+
+def test_riddle_choices_are_shuffled_without_changing_the_answer() -> None:
+    original = local_question_candidates("riddle_guess")[0]
+    assert original.choices[0].value == original.answer
+    shuffled = shuffle_question_choices(original, random.Random(7))
+    assert shuffled.answer == original.answer
+    assert {choice.value for choice in shuffled.choices} == {
+        choice.value for choice in original.choices
+    }
+    assert shuffled.choices != original.choices
 
 
 def test_history_survives_restart_and_provider_duplicates(

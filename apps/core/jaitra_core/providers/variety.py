@@ -109,6 +109,15 @@ def repeats_question(
     return any(old.answer == question.answer and old.kind == question.kind for old in history[:12])
 
 
+def shuffle_question_choices(
+    question: GeneratedQuestion, rng: random.Random = RNG
+) -> GeneratedQuestion:
+    """Return a question with independently shuffled choices and the same answer."""
+    choices = list(question.choices)
+    rng.shuffle(choices)
+    return question.model_copy(update={"choices": choices})
+
+
 def local_question_candidates(activity_id: str) -> list[GeneratedQuestion]:
     candidates: list[GeneratedQuestion] = []
 
