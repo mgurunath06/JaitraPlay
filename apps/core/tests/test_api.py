@@ -64,6 +64,16 @@ def test_websocket_route_and_snapshot_contract(config: AppConfig, repository_roo
         runtime.stop()
 
 
+def test_hub_lists_registered_apps_without_a_manual_choice_limit(
+    config: AppConfig, repository_root: Path
+) -> None:
+    config.ui.max_hub_choices = 1
+    runtime = CoreRuntime(config, repository_root=repository_root)
+    activities = runtime.snapshot().payload.activities
+    assert len(activities) == 6
+    assert activities[-1].activity_id == "tell_time"
+
+
 def test_ai_question_route(config: AppConfig, repository_root: Path) -> None:
     runtime = CoreRuntime(config, repository_root=repository_root)
     runtime.start()

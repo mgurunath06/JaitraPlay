@@ -26,7 +26,9 @@ class CompanionConfig(StrictModel):
 
 
 class UiConfig(StrictModel):
-    max_hub_choices: int = Field(default=6, ge=1, le=6)
+    # Kept only so existing appliance configurations remain readable. The hub now
+    # displays every registered activity and does not require a manual count update.
+    max_hub_choices: int | None = Field(default=None, ge=1)
     inactivity_seconds: int = Field(default=300, ge=30, le=3600)
     pointer_visible: bool = True
 

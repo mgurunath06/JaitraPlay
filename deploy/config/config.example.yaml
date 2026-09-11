@@ -4,7 +4,6 @@ child:
 companion:
   name: "Mimo"
 ui:
-  max_hub_choices: 6
   inactivity_seconds: 300
   pointer_visible: true
 activities:

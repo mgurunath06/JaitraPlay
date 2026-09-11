@@ -370,6 +370,7 @@ Use **Remember Jaitra → Camera experiment** for opt-in frame diagnostics and l
 **Time with Mimo** shows a large analog clock and asks the child to tell the time.
 Choose whole hours, half hours, quarter hours, or five-minute steps. Tap or speak
 an answer, reveal a teaching explanation, or skip without being blocked by voice.
-Set `ui.max_hub_choices: 6` in an existing configuration to show the sixth app.
+Every registered app appears automatically; adding an app does not require a separate
+hub-count configuration change.
 See [the learning-game assessment](docs/LEARNING_GAMES.md) for the proposed
 literacy activities, current project support, and remaining implementation work.

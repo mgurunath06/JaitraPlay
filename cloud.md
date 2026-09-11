@@ -79,8 +79,8 @@ This is a local trust boundary, not an authenticated public service.
 
 ### Games and Mimo
 
-The hub offers Picture Guess, Colour Quest, Memory Match, Riddle Garden, and Mimo's
-Storybook, capped by `ui.max_hub_choices`. Quizzes mix cloud output with curated
+The hub offers every activity registered by the running core, including Picture Guess,
+Colour Quest, Memory Match, Riddle Garden, Mimo's Storybook, and Time with Mimo. Quizzes mix cloud output with curated
 picture, counting, odd-one-out, colour/shape, riddle, memory, and room-hunt content.
 Provider failure or repeated output falls back to local questions. History tracks
 the last 120 generated questions across activities and restarts. Local pools use
@@ -328,9 +328,8 @@ claiming production acceptance.
 
 ## Analysis findings and remaining work
 
-- Hub descriptors currently use the static catalog and `max_hub_choices`, not
-  the validated `activities.enabled` intersection. Configured content gating
-  therefore does not fully govern visible or callable games.
+- Hub descriptors currently use the static implemented-app catalog. The legacy
+  `max_hub_choices` setting is accepted for compatibility but no longer hides apps.
 - Rounds/scores are UI-local; durable rewards, sessions, full parent mode,
   family identity profiles and controlled video playback are not implemented.
   Jaitra-only local enrollment and recognition are described in README.md.

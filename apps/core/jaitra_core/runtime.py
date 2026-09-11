@@ -165,7 +165,7 @@ class CoreRuntime:
                         icon=item["icon"],
                         availability="AVAILABLE",
                     )
-                    for item in APP_CATALOG[: self.config.ui.max_hub_choices]
+                    for item in APP_CATALOG
                 ],
             )
         )
