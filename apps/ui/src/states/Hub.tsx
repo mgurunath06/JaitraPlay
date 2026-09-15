@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { PlayApp, type PlayableActivity } from "./PlayApp";
 import { ClockApp } from "./ClockApp";
 import { StorybookApp } from "./StorybookApp";
+import { AirWritingApp, BodyLettersApp, CoReadingApp, LetterLabelsApp, SoundHuntApp, TwoLetterWordsApp, WordCardsApp } from "./LiteracyApps";
 
 interface Activity extends PlayableActivity {
   activityId: string;
@@ -22,6 +23,14 @@ export function Hub({ activities, voiceAvailable = false, onPlayingChange, onSto
     if (selected.activityId === "storybook") {
       return <StorybookApp voiceAvailable={voiceAvailable} onReadingChange={onStoryReadingChange} onBack={() => { quietMimo(); setSelected(null); }} />;
     }
+    const back = () => { quietMimo(); setSelected(null); };
+    if (selected.activityId === "air_writing") return <AirWritingApp onBack={back} />;
+    if (selected.activityId === "sound_hunt") return <SoundHuntApp voiceAvailable={voiceAvailable} onBack={back} />;
+    if (selected.activityId === "co_reading") return <CoReadingApp voiceAvailable={voiceAvailable} onBack={back} />;
+    if (selected.activityId === "letter_labels") return <LetterLabelsApp onBack={back} />;
+    if (selected.activityId === "body_letters") return <BodyLettersApp onBack={back} />;
+    if (selected.activityId === "two_letter_words") return <TwoLetterWordsApp voiceAvailable={voiceAvailable} onBack={back} />;
+    if (selected.activityId === "word_cards") return <WordCardsApp onBack={back} />;
     return <PlayApp voiceAvailable={voiceAvailable} activity={selected} onBack={() => { quietMimo(); setSelected(null); }} />;
   }
 

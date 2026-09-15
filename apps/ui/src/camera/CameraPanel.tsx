@@ -4,7 +4,7 @@ import type { SetupSettings, Zone } from "../setup/settings";
 import { observe, type Landmark, type Observation, type WristSample } from "./observe";
 
 const empty: Observation = { presence: "No person visible", position: "Unknown", zone: "Unknown", gesture: "No gesture" };
-export function CameraPanel({ settings, onZones, onStarted, simple = false }: { settings: SetupSettings; onZones?: (zones: Zone[]) => void; onStarted?: () => void; simple?: boolean }) {
+export function CameraPanel({ settings, onZones, onStarted, onObservation, onPoses, simple = false }: { settings: SetupSettings; onZones?: (zones: Zone[]) => void; onStarted?: () => void; onObservation?: (observation: Observation) => void; onPoses?: (poses: Landmark[][]) => void; simple?: boolean }) {
   const video = useRef<HTMLVideoElement>(null);
   const stream = useRef<MediaStream | null>(null);
   const worker = useRef<Worker | null>(null);
@@ -13,6 +13,8 @@ export function CameraPanel({ settings, onZones, onStarted, simple = false }: { 
   const watchdog = useRef<number | undefined>(undefined);
   const settingsRef = useRef(settings);
   settingsRef.current = settings;
+  const observationCallback = useRef(onObservation); observationCallback.current = onObservation;
+  const posesCallback = useRef(onPoses); posesCallback.current = onPoses;
   const [state, setState] = useState<"off" | "starting" | "on">("off");
   const [error, setError] = useState("");
   const [backend, setBackend] = useState("");
@@ -95,6 +97,8 @@ export function CameraPanel({ settings, onZones, onStarted, simple = false }: { 
         if (data.type === "result") {
           const observation = observe(data.landmarks, settingsRef.current.zones, history, data.time);
           setObservation(observation);
+          observationCallback.current?.(observation);
+          posesCallback.current?.(data.landmarks);
           if (data.time - lastDiagnostic >= 2000) {
             lastDiagnostic = data.time;
             diagnostic("camera.observation", { people: data.landmarks.length, gesture: observation.gesture, durationMs: Math.round(performance.now() - data.time), visibility: Math.min(...[11, 12, 15, 16].map(i => data.landmarks[0]?.[i]?.visibility ?? 0)) });

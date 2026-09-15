@@ -26,12 +26,13 @@ def test_api_boot_and_idempotent_commands(config: AppConfig, repository_root: Pa
                 "voice": "DISABLED",
                 "camera": "CLIENT_MANAGED",
             }
-            assert len(snapshot["payload"]["activities"]) == 5
+            assert len(snapshot["payload"]["activities"]) == 12
             assert snapshot["payload"]["activities"][0]["activityId"] == "picture_guess"
             assert snapshot["payload"]["activities"][0]["availability"] == "AVAILABLE"
             assert snapshot["payload"]["activities"][1]["activityId"] == "memory_cards"
             assert snapshot["payload"]["activities"][3]["activityId"] == "storybook"
             assert snapshot["payload"]["activities"][4]["activityId"] == "tell_time"
+            assert snapshot["payload"]["activities"][-1]["activityId"] == "word_cards"
 
             activity = await client.post("/api/v1/activity")
             assert activity.status_code == 200
@@ -75,8 +76,8 @@ def test_hub_lists_registered_apps_without_a_manual_choice_limit(
     config.ui.max_hub_choices = 1
     runtime = CoreRuntime(config, repository_root=repository_root)
     activities = runtime.snapshot().payload.activities
-    assert len(activities) == 5
-    assert activities[-1].activity_id == "tell_time"
+    assert len(activities) == 12
+    assert activities[-1].activity_id == "word_cards"
 
 
 def test_ai_question_route(config: AppConfig, repository_root: Path) -> None:

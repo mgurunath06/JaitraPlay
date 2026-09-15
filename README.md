@@ -375,3 +375,29 @@ Every registered app appears automatically; adding an app does not require a sep
 hub-count configuration change.
 See [the learning-game assessment](docs/LEARNING_GAMES.md) for the proposed
 literacy activities, current project support, and remaining implementation work.
+
+## Complete app catalog
+
+The home screen now lists all 12 apps: Picture Guess, Memory Match,
+Riddle & Discovery Garden, Mimo’s Storybook, Time with Mimo, Air Writing,
+Sound Hunt, Read With Mimo, Letter Labels, Body Letters, Two-Letter Words,
+and Build With Letter Cards.
+
+In **Setup → Weekly literacy focus**, enter letters or short words,
+for example `b, m, at, in`. Sound Hunt uses the letters; co-reading and two-letter
+practice prioritize matching words; letter-card building uses words of two to
+four letters. Other activities currently retain their fixed letter sequences.
+
+The seven literacy activities work offline apart from optional transcription to
+the local core. Camera activities require explicitly starting the preview.
+Voice has touch/grown-up alternatives and stops after 6.5 seconds or when leaving
+the round or hiding the app. Print alphabet cards from Build With Letter Cards;
+print extra copies for repeated letters. Name room zones after your physical
+labels in Setup before opening Letter Labels.
+
+These are first playable versions: air trails and body poses need child-camera
+calibration; Sound Hunt checks initial spelling, not phonetic pronunciation;
+Read With Mimo uses eight curated sentences, with local speech on request and
+no adaptive reading-level tracking. Two-letter practice provides visual blending
+and picture cues, without reviewed phoneme recordings. Physical cards require
+explicit grown-up verification; automatic card recognition is not implemented.

@@ -284,3 +284,20 @@ body { overflow-y: auto; }
 .clock-game > label { display: block; margin-block: 1rem; }
 .clock-game select { padding: .5rem; margin-left: .5rem; font: inherit; }
 .clock-game .choice-button { min-height: 80px; font-size: 2rem; }
+.literacy-game { text-align: center; }
+.literacy-game .camera-panel { width: min(560px, 100%); margin: 1rem auto; padding: .8rem; border-radius: 18px; color: #f1f5f9; background: #10253f; text-align: left; }
+.literacy-letter { margin: .4rem 0; color: #6e5bd4; font-size: clamp(90px, 15vw, 180px); text-transform: uppercase; }
+.air-writing-board { width: min(500px, 100%); max-height: 330px; border-radius: 24px; background: #10253f; }
+.air-writing-board text { fill: #ffffff18; stroke: #fff5; stroke-width: 1; font: 100px/1 sans-serif; }
+.air-writing-board polyline { fill: none; stroke: #70f5ad; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; filter: drop-shadow(0 0 5px #70f5ad); }
+.literacy-actions { display: flex; justify-content: center; flex-wrap: wrap; gap: 12px; margin: 1rem 0; }
+.co-reading-sentence { margin: 2rem auto; max-width: 800px; font: 700 clamp(34px, 5vw, 70px)/1.45 Georgia, serif; }
+.co-reading-sentence mark { padding: .05em .18em; border-radius: .2em; color: #17324d; background: #ffe174; }
+.zone-word, .word-blend { margin: 1rem; font-size: clamp(54px, 9vw, 110px); }
+.built-word { display: flex; justify-content: center; gap: 12px; margin: 1.5rem; }
+.built-word span { display: grid; width: 1.4em; height: 1.4em; place-items: center; border-bottom: 6px solid #6e5bd4; font-size: clamp(48px, 7vw, 88px); font-weight: 900; }
+.letter-card-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(100px,1fr)); gap: 14px; max-width: 760px; margin: auto; }
+.letter-card-grid button { min-height: 110px; border: 4px solid white; border-radius: 20px; background: #fff3cb; color: #17324d; font-size: 42px; font-weight: 900; cursor: pointer; }
+.printable-letter-cards { display: none; }
+.weekly-focus { margin-bottom: 18px; padding: 12px 18px; border-radius: 14px; background: #213f58; }
+@media print { body * { visibility: hidden; } .printable-letter-cards, .printable-letter-cards * { visibility: visible; } .printable-letter-cards { position: fixed; inset: 0; display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; padding: 12px; background: white; } .printable-letter-cards span { display: grid; place-items: center; border: 4px solid #111; font: 900 72px sans-serif; } }

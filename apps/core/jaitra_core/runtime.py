@@ -69,6 +69,48 @@ APP_CATALOG = (
         "description": "Read a big clock, from whole hours to five-minute steps.",
         "icon": "🕒",
     },
+    {
+        "activity_id": "air_writing",
+        "title": "Air Writing",
+        "description": "Trace letters in the air and see your hand path glow.",
+        "icon": "✍️",
+    },
+    {
+        "activity_id": "sound_hunt",
+        "title": "Sound Hunt",
+        "description": "Find real things whose names begin with a chosen sound.",
+        "icon": "🔎",
+    },
+    {
+        "activity_id": "co_reading",
+        "title": "Read With Mimo",
+        "description": "Read one big word while Mimo helps with the sentence.",
+        "icon": "📚",
+    },
+    {
+        "activity_id": "letter_labels",
+        "title": "Letter Labels",
+        "description": "Walk to printed word labels placed around the real room.",
+        "icon": "🏷️",
+    },
+    {
+        "activity_id": "body_letters",
+        "title": "Body Letters",
+        "description": "Make letter shapes using arms, legs and the camera.",
+        "icon": "🤸",
+    },
+    {
+        "activity_id": "two_letter_words",
+        "title": "Two-Letter Words",
+        "description": "Stretch two sounds, blend them and choose the word.",
+        "icon": "🔤",
+    },
+    {
+        "activity_id": "word_cards",
+        "title": "Build With Letter Cards",
+        "description": "Build short words using printed, foam or magnetic letters.",
+        "icon": "🧩",
+    },
 )
 QUESTION_ACTIVITY_IDS = {"picture_guess", "colours_shapes", "memory_cards", "riddle_guess"}
 
