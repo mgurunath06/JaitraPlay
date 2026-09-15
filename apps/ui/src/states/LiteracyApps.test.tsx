@@ -16,6 +16,13 @@ it.each(["air_writing", "sound_hunt", "co_reading", "letter_labels", "body_lette
   fireEvent.click(screen.getByRole("button", { name: /Exit to home/ }));
   expect(screen.getByRole("heading", { name: "Choose an app" })).toBeVisible();
 });
+it("opens Memory Match locally without requesting a generated question", () => {
+  const getQuestion = vi.spyOn(coreClient, "getQuestion");
+  render(<Hub activities={[{ activityId: "memory_cards", title: "Memory Match", description: "Practice", icon: "A", availability: "AVAILABLE" }]} onPlayingChange={vi.fn()} homeRequest={0} />);
+  fireEvent.click(screen.getByRole("button", { name: "Memory Match, available" }));
+  expect(screen.getAllByRole("button", { name: /Hidden card/ })).toHaveLength(16);
+  expect(getQuestion).not.toHaveBeenCalled();
+});
 it("highlights whole words and allows co-reading without speech", () => {
   const { container } = render(<CoReadingApp onBack={vi.fn()} voiceAvailable={false} />);
   expect(container.querySelectorAll("mark")).toHaveLength(1);

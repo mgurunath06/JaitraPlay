@@ -21,7 +21,7 @@ All character depictions and generated media must follow the canonical
 The current working tree also includes provider-generated quizzes, curated offline challenges,
 room hunts, hint history, optional local English speech recognition, and a local camera setup
 for position and gestures. Identity recognition, a full parent mode, and controlled video
-playback are not implemented. Gameplay uses the core's question API; rounds and scores remain in the UI.
+playback are not implemented. Generated quizzes use the core's question API; rounds and scores remain in the UI.
 
 Questions are remembered on this appliance across app restarts (the latest 120 rounds).
 Provider repeats are rejected using prompt similarity and recent answer targets. Games mix
@@ -406,6 +406,11 @@ The home screen now lists all 12 apps: Picture Guess, Memory Match,
 Riddle & Discovery Garden, Mimo’s Storybook, Time with Mimo, Air Writing,
 Sound Hunt, Read With Mimo, Letter Labels, Body Letters, Two-Letter Words,
 and Build With Letter Cards.
+
+Memory Match runs instantly and entirely in the UI: it makes no AI or question-provider
+request. Choose a 4 x 4, 6 x 6, or 8 x 8 board. Each new game randomly selects from 32
+bundled symbols and shuffles their positions while keeping matching cards from starting
+directly beside one another.
 
 In **Setup → Weekly literacy focus**, enter letters or short words,
 for example `b, m, at, in`. Sound Hunt uses the letters; co-reading and two-letter

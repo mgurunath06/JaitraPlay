@@ -4,6 +4,7 @@ import { PlayApp, type PlayableActivity } from "./PlayApp";
 import { ClockApp } from "./ClockApp";
 import { StorybookApp } from "./StorybookApp";
 import { AirWritingApp, BodyLettersApp, CoReadingApp, LetterLabelsApp, SoundHuntApp, TwoLetterWordsApp, WordCardsApp } from "./LiteracyApps";
+import { MemoryApp } from "./MemoryApp";
 
 interface Activity extends PlayableActivity {
   activityId: string;
@@ -31,6 +32,7 @@ export function Hub({ activities, voiceAvailable = false, onPlayingChange, onSto
     if (selected.activityId === "body_letters") return <BodyLettersApp onBack={back} />;
     if (selected.activityId === "two_letter_words") return <TwoLetterWordsApp voiceAvailable={voiceAvailable} onBack={back} />;
     if (selected.activityId === "word_cards") return <WordCardsApp onBack={back} />;
+    if (selected.activityId === "memory_cards") return <MemoryApp onBack={back} />;
     return <PlayApp voiceAvailable={voiceAvailable} activity={selected} onBack={() => { quietMimo(); setSelected(null); }} />;
   }
 
