@@ -62,6 +62,65 @@ def test_transcription_preserves_segments_and_validates_audio(
     assert list(tmp_path.iterdir()) == []  # No audio or transcript files.
 
 
+def test_invalid_vosk_grammar_falls_back_to_unconstrained_recognition(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    grammars: list[str | None] = []
+
+    class Recognizer:
+        def __init__(self, _model: object, _rate: int, grammar: str | None = None) -> None:
+            grammars.append(grammar)
+            if grammar:
+                raise ValueError("word missing from recognizer vocabulary")
+
+        def AcceptWaveform(self, _audio: bytes) -> bool:
+            return False
+
+        def FinalResult(self) -> str:
+            return '{"text":"elephant"}'
+
+    fake = SimpleNamespace(
+        Model=lambda _path: object(), SetLogLevel=lambda _level: None, KaldiRecognizer=Recognizer
+    )
+    monkeypatch.setattr("jaitra_core.voice.importlib.import_module", lambda _name: fake)
+    service = VoiceService(tmp_path, True)
+    service.start()
+    result = service.transcribe(base64.b64encode(bytes(100)).decode(), 16000, ["elephant"])
+    assert result == "elephant"
+    assert len(grammars) == 2 and grammars[0] is not None and grammars[1] is None
+
+
+def test_grammar_maps_digits_and_drops_phrases_outside_model_vocabulary(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    graph = tmp_path / "graph"
+    graph.mkdir()
+    (graph / "words.txt").write_text("blue 1\nthree 2\noption 3\n[unk] 4\n")
+    grammars: list[str | None] = []
+
+    class Recognizer:
+        def __init__(self, _model: object, _rate: int, grammar: str | None = None) -> None:
+            grammars.append(grammar)
+
+        def AcceptWaveform(self, _audio: bytes) -> bool:
+            return False
+
+        def FinalResult(self) -> str:
+            return '{"text":"three"}'
+
+    fake = SimpleNamespace(
+        Model=lambda _path: object(), SetLogLevel=lambda _level: None, KaldiRecognizer=Recognizer
+    )
+    monkeypatch.setattr("jaitra_core.voice.importlib.import_module", lambda _name: fake)
+    service = VoiceService(tmp_path, True)
+    service.start()
+    result = service.transcribe(
+        base64.b64encode(bytes(100)).decode(), 16000, ["blue", "3", "option 3", "zorb"]
+    )
+    assert result == "three"
+    assert json.loads(grammars[0] or "[]") == ["blue", "three", "option three", "[unk]"]
+
+
 def test_voice_api_rejects_invalid_audio_and_reports_disabled(
     config: AppConfig,
     repository_root: Path,

@@ -4,12 +4,13 @@ import type { GeneratedQuestion } from "../../../../packages/contracts/src";
 import { readSettings } from "../setup/settings";
 import { coreClient } from "../app/coreClient";
 import { matchAnswer, matchChoiceNumber, recognitionPhrases } from "./match";
-import { CaptureError, recordVoice, type Recording } from "./record";
+import { CaptureError, recordVoice, type CaptureQuality, type Recording } from "./record";
 
-export function VoiceAnswer({ choices, onAnswer, onTranscript, useCorrections = true, constrainRecognition = true, numberChoices = false }: { choices: GeneratedQuestion["choices"]; onAnswer: (value: string) => void; onTranscript?: (text: string) => void; useCorrections?: boolean; constrainRecognition?: boolean; numberChoices?: boolean }) {
+export function VoiceAnswer({ choices, onAnswer, onTranscript, onQuality, useCorrections = true, constrainRecognition = true, numberChoices = false }: { choices: GeneratedQuestion["choices"]; onAnswer: (value: string) => void; onTranscript?: (text: string) => void; onQuality?: (quality: CaptureQuality) => void; useCorrections?: boolean; constrainRecognition?: boolean; numberChoices?: boolean }) {
   const [state, setState] = useState<"idle" | "starting" | "listening" | "processing">("idle");
   const [level, setLevel] = useState(0);
   const [message, setMessage] = useState("");
+  const qualityRef = useRef("");
   const capture = useRef<Recording | null>(null);
   const controller = useRef<AbortController | null>(null);
   const timer = useRef<number | undefined>(undefined);
@@ -41,7 +42,7 @@ export function VoiceAnswer({ choices, onAnswer, onTranscript, useCorrections = 
       const matched = matchAnswer(result.text, choices, useCorrections ? readSettings().voiceAliases : {}) ?? (numberChoices ? matchChoiceNumber(result.text, choices) : null);
       diagnostic("voice.match", { matched: Boolean(matched), words: result.text.split(/\s+/).filter(Boolean).length });
       onTranscript?.(result.text);
-      setMessage(result.text ? `I heard “${result.text}”.${matched ? " Got it!" : " Try one answer shown on the screen."}` : "Sound was captured, but no words were recognised. Check the input meter in Setup and try toggling Browser noise cleanup.");
+      setMessage(result.text ? `I heard “${result.text}”.${matched ? " Got it!" : " Try one answer shown on the screen."}` : `Sound was captured, but no words were recognised. ${qualityRef.current || "Check the input meter in Setup and try toggling Browser noise cleanup."}`);
       if (matched) onAnswer(matched);
     } catch (error) {
       diagnostic("voice.recognition.error", { error: error instanceof Error ? error.name : "UnknownError" });
@@ -54,9 +55,9 @@ export function VoiceAnswer({ choices, onAnswer, onTranscript, useCorrections = 
     controller.current?.abort();
     const current = new AbortController();
     controller.current = current;
-    setState("starting"); setMessage(""); setLevel(0);
+    qualityRef.current = ""; setState("starting"); setMessage(""); setLevel(0);
     try {
-      const recording = await recordVoice(current.signal, setLevel);
+      const recording = await recordVoice(current.signal, setLevel, result => { qualityRef.current = result.message; onQuality?.(result); });
       if (current.signal.aborted) { recording.cancel(); return; }
       capture.current = recording;
       setState("listening");

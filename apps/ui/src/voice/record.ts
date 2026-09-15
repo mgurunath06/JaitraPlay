@@ -1,6 +1,20 @@
 import { diagnostic } from "../app/diagnostics";
 import { quietMimo } from "../components/mimo";
 import { readSettings } from "../setup/settings";
+export interface CaptureQuality {
+  peak: number;
+  rms: number;
+  speechRms: number;
+  noiseRms: number;
+  snrDb: number;
+  clippedPercent: number;
+  dcOffset: number;
+  speechDurationMs: number;
+  selectedChannel: number;
+  channels: number;
+  gain: number;
+  message: string;
+}
 export interface Recording { stop(): Promise<{ audio: string; sampleRate: number }>; cancel(): void }
 
 export class CaptureError extends Error {}
@@ -22,7 +36,104 @@ export function encodePcm(chunks: Float32Array[], maxSamples: number, gain = 1):
   return btoa(binary);
 }
 
-export async function recordVoice(signal: AbortSignal, onLevel?: (rms: number) => void): Promise<Recording> {
+/** Remove DC offset and low-frequency handling/desk noise without gating quiet speech. */
+export function highPassVoice(samples: Float32Array, sampleRate: number): Float32Array {
+  const output = new Float32Array(samples.length);
+  if (!samples.length) return output;
+  const alpha = Math.exp(-2 * Math.PI * 70 / sampleRate);
+  let previousInput = samples[0], previousOutput = 0;
+  for (let index = 1; index < samples.length; index++) {
+    const value = alpha * (previousOutput + samples[index] - previousInput);
+    output[index] = value;
+    previousInput = samples[index]; previousOutput = value;
+  }
+  return output;
+}
+
+/** Windowed-sinc low-pass resampling normalises Vosk input to 16 kHz without aliasing. */
+export function downsampleVoice(samples: Float32Array, inputRate: number, outputRate = 16000): Float32Array {
+  if (inputRate === outputRate) return samples.slice();
+  const ratio = inputRate / outputRate;
+  const output = new Float32Array(Math.floor(samples.length / ratio));
+  const cutoff = Math.min(1, outputRate / inputRate) * .9125;
+  const radius = 24;
+  const sinc = (value: number) => Math.abs(value) < 1e-8 ? 1 : Math.sin(Math.PI * value) / (Math.PI * value);
+  for (let out = 0; out < output.length; out++) {
+    const center = (out + .5) * ratio - .5;
+    const first = Math.max(0, Math.ceil(center - radius));
+    const last = Math.min(samples.length - 1, Math.floor(center + radius));
+    let sum = 0, weight = 0;
+    for (let input = first; input <= last; input++) {
+      const distance = center - input;
+      const window = .5 + .5 * Math.cos(Math.PI * distance / radius);
+      const coefficient = cutoff * sinc(cutoff * distance) * window;
+      sum += samples[input] * coefficient; weight += coefficient;
+    }
+    output[out] = weight ? sum / weight : 0;
+  }
+  return output;
+}
+
+export function captureQuality(samples: Float32Array, sampleRate: number): CaptureQuality {
+  let peak = 0, squareSum = 0, clipped = 0, sum = 0;
+  const frameSize = Math.max(1, Math.round(sampleRate * .02));
+  const frames: number[] = [];
+  for (let offset = 0; offset < samples.length; offset += frameSize) {
+    let frameSquares = 0;
+    const end = Math.min(samples.length, offset + frameSize);
+    for (let index = offset; index < end; index++) {
+      const absolute = Math.abs(samples[index]);
+      peak = Math.max(peak, absolute); sum += samples[index]; squareSum += samples[index] ** 2; frameSquares += samples[index] ** 2;
+      if (absolute >= .98) clipped++;
+    }
+    frames.push(Math.sqrt(frameSquares / Math.max(1, end - offset)));
+  }
+  frames.sort((a, b) => a - b);
+  const percentile = (fraction: number) => frames[Math.min(frames.length - 1, Math.floor(frames.length * fraction))] ?? 0;
+  // The 97th percentile still finds a brief word in a 6.5-second capture while ignoring spikes.
+  const noiseRms = percentile(.2), speechRms = percentile(.97);
+  const snrDb = Math.min(60, Math.max(0, 20 * Math.log10((speechRms + 1e-7) / (noiseRms + 1e-7))));
+  const clippedPercent = samples.length ? clipped / samples.length * 100 : 0;
+  const message = clippedPercent >= 1 ? "Input is clipping. Lower the Ubuntu microphone input volume."
+    : speechRms < .003 ? "The recording is very quiet. Check the selected input, mute and Ubuntu input volume."
+    : snrDb < 6 ? "Speech is close to the background-noise level. Move nearer to the microphone or reduce room noise."
+    : "Audio level looks usable.";
+  return { peak, rms: Math.sqrt(squareSum / Math.max(1, samples.length)), speechRms, noiseRms, snrDb, clippedPercent,
+    dcOffset: sum / Math.max(1, samples.length), speechDurationMs: 0, selectedChannel: 1, channels: 1, gain: 1, message };
+}
+
+export function speechRegion(samples: Float32Array, sampleRate: number, noiseRms: number): { samples: Float32Array; durationMs: number; speechRms: number; limitPeak: number } {
+  const frameSize = Math.max(1, Math.round(sampleRate * .02));
+  const candidates: { offset: number; level: number }[] = [];
+  const active: number[] = [], levels: number[] = [];
+  const threshold = Math.max(noiseRms * 2.5, noiseRms + .0002);
+  for (let offset = 0; offset < samples.length; offset += frameSize) {
+    const frame = samples.subarray(offset, Math.min(samples.length, offset + frameSize));
+    let squares = 0;
+    for (const value of frame) squares += value * value;
+    const level = Math.sqrt(squares / Math.max(1, frame.length));
+    if (level >= threshold) candidates.push({ offset, level });
+  }
+  for (let index = 0; index < candidates.length;) {
+    let end = index + 1;
+    while (end < candidates.length && candidates[end].offset === candidates[end - 1].offset + frameSize) end++;
+    if (end - index >= 2) {
+      for (const candidate of candidates.slice(index, end)) { active.push(candidate.offset); levels.push(candidate.level); }
+    }
+    index = end;
+  }
+  const margin = Math.round(sampleRate * .2);
+  const start = active.length ? Math.max(0, active[0] - margin) : 0;
+  const end = active.length ? Math.min(samples.length, active.at(-1)! + frameSize + margin) : samples.length;
+  const trimmed = samples.slice(start, end);
+  levels.sort((a, b) => a - b);
+  const speechRms = levels[Math.floor(levels.length * .7)] ?? captureQuality(samples, sampleRate).speechRms;
+  const magnitudes = Array.from(trimmed, Math.abs).sort((a, b) => a - b);
+  const limitPeak = magnitudes[Math.min(magnitudes.length - 1, Math.floor(magnitudes.length * .999))] ?? 0;
+  return { samples: trimmed, durationMs: Math.round(active.length * frameSize / sampleRate * 1000), speechRms, limitPeak };
+}
+
+export async function recordVoice(signal: AbortSignal, onLevel?: (rms: number) => void, onQuality?: (quality: CaptureQuality) => void): Promise<Recording> {
   quietMimo();
   const settings = readSettings();
   const deviceId = settings.microphoneId;
@@ -47,12 +158,17 @@ export async function recordVoice(signal: AbortSignal, onLevel?: (rms: number) =
   let node: AudioWorkletNode | undefined;
   let samples = 0;
   let closed = false;
-  let peak = 0;
-  let squareSum = 0;
   let lastMeter = 0;
-  const track = stream.getTracks()[0];
+  const track = stream.getAudioTracks()[0];
+  if (!track) { closeTracks(); void context.close(); throw new CaptureError("The selected device did not provide an audio track."); }
   const actual = track?.getSettings?.();
-  diagnostic("voice.device", { sampleRate: actual?.sampleRate ?? context.sampleRate, channels: actual?.channelCount ?? 0, muted: track?.muted ?? false, enabled: track?.enabled ?? true });
+  diagnostic("voice.device", {
+    device: track.label.slice(0, 80) || (deviceId ? "saved device" : "system default"),
+    trackSampleRate: actual?.sampleRate ?? 0, contextSampleRate: context.sampleRate,
+    channels: actual?.channelCount ?? 0, muted: track.muted, enabled: track.enabled,
+    echoCancellation: actual?.echoCancellation ?? false, noiseSuppression: actual?.noiseSuppression ?? false,
+    autoGainControl: actual?.autoGainControl ?? false,
+  });
   const cancel = () => {
     if (closed) return;
     closed = true;
@@ -65,23 +181,26 @@ export async function recordVoice(signal: AbortSignal, onLevel?: (rms: number) =
   };
   signal.addEventListener("abort", cancel, { once: true });
   try {
-    if (![16000, 44100, 48000].includes(context.sampleRate)) {
-      throw new CaptureError("Set your audio device to 44.1 or 48 kHz in system sound settings, then try again.");
-    }
+    if (context.sampleRate < 8000 || context.sampleRate > 192000) throw new CaptureError("The microphone reported an unsupported sample rate.");
     await context.audioWorklet.addModule(new URL("./pcm-worklet.js", import.meta.url));
     if (signal.aborted) throw new Error("Cancelled");
     source = context.createMediaStreamSource(stream);
-    node = new AudioWorkletNode(context, "pcm-capture");
-    node.port.onmessage = (event: MessageEvent<Float32Array>) => {
+    node = new AudioWorkletNode(context, "pcm-capture", { channelCountMode: "max", channelInterpretation: "discrete" });
+    source.channelCountMode = "max";
+    source.channelInterpretation = "discrete";
+    let selectedChannel = 1, channelCount = actual?.channelCount ?? 1;
+    node.port.onmessage = (event: MessageEvent<{ samples: Float32Array; channel: number; channels: number }>) => {
       if (closed || samples >= context.sampleRate * 8) return;
-      chunks.push(event.data);
-      samples += event.data.length;
+      selectedChannel = event.data.channel;
+      channelCount = event.data.channels;
+      const frame = event.data.samples.subarray(0, context.sampleRate * 8 - samples);
+      chunks.push(frame);
+      samples += frame.length;
       let frameSquares = 0;
-      for (const sample of event.data) { peak = Math.max(peak, Math.abs(sample)); frameSquares += sample * sample; }
-      squareSum += frameSquares;
+      for (const sample of frame) frameSquares += sample * sample;
       if (samples - lastMeter >= context.sampleRate / 10) {
         lastMeter = samples;
-        onLevel?.(Math.sqrt(frameSquares / Math.max(1, event.data.length)));
+        onLevel?.(Math.sqrt(frameSquares / Math.max(1, frame.length)));
       }
     };
     source.connect(node);
@@ -91,14 +210,34 @@ export async function recordVoice(signal: AbortSignal, onLevel?: (rms: number) =
       cancel,
       stop: async () => {
         cancel();
-        const rms = Math.sqrt(squareSum / Math.max(1, samples));
-        const gain = captureGain(rms, peak);
-        diagnostic("voice.capture.finish", { samples, sampleRate: context.sampleRate, peak, rms, gain, durationMs: Math.round(samples / context.sampleRate * 1000) });
-        const audio = encodePcm(chunks, context.sampleRate * 8, gain);
-        chunks.length = 0;
         if (!samples) throw new CaptureError("The microphone opened but sent no audio. Check the selected microphone and system input settings.");
-        if (peak < 1 / 32768) throw new CaptureError("The microphone sent silence. Check mute, input volume, and the selected microphone in Setup.");
-        return { audio, sampleRate: context.sampleRate };
+        const joined = new Float32Array(samples);
+        let offset = 0;
+        for (const chunk of chunks) { joined.set(chunk.subarray(0, samples - offset), offset); offset += Math.min(chunk.length, samples - offset); }
+        chunks.length = 0;
+        const rawQuality = captureQuality(joined, context.sampleRate);
+        if (rawQuality.peak < 1 / 32768) throw new CaptureError("The microphone sent silence. Check mute, input volume, and the selected microphone in Setup.");
+        const cleaned = highPassVoice(joined, context.sampleRate);
+        const quality = captureQuality(cleaned, context.sampleRate);
+        const region = speechRegion(cleaned, context.sampleRate, quality.noiseRms);
+        const gain = captureGain(region.speechRms, region.limitPeak);
+        const normalised = downsampleVoice(region.samples, context.sampleRate);
+        const snrDb = Math.min(60, Math.max(0, 20 * Math.log10((region.speechRms + 1e-7) / (quality.noiseRms + 1e-7))));
+        const resultQuality = {
+          ...quality, speechRms: region.speechRms, speechDurationMs: region.durationMs,
+          clippedPercent: rawQuality.clippedPercent, dcOffset: rawQuality.dcOffset,
+          snrDb, selectedChannel, channels: channelCount, gain,
+        };
+        diagnostic("voice.capture.finish", {
+          samples, inputSampleRate: context.sampleRate, outputSampleRate: 16000,
+          peak: quality.peak, rms: quality.rms, speechRms: region.speechRms, noiseRms: quality.noiseRms,
+          snrDb: Math.round(snrDb * 10) / 10, clippedPercent: Math.round(rawQuality.clippedPercent * 100) / 100,
+          dcOffset: rawQuality.dcOffset, speechDurationMs: region.durationMs,
+          selectedChannel, channels: channelCount, gain,
+          durationMs: Math.round(samples / context.sampleRate * 1000), quality: quality.message,
+        });
+        onQuality?.({ ...resultQuality, message: rawQuality.clippedPercent >= 1 ? "Input is clipping. Lower the Ubuntu microphone input volume." : quality.message });
+        return { audio: encodePcm([normalised], normalised.length, gain), sampleRate: 16000 };
       },
     };
   } catch (error) { diagnostic("voice.capture.error", { error: error instanceof Error ? error.name : "UnknownError" }); cancel(); throw error; }

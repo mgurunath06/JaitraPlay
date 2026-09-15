@@ -20,7 +20,7 @@ describe("voice answers", () => {
     expect(matchAnswer("blue or red", choices)).toBeNull();
     expect(matchAnswer("blueberry", choices)).toBeNull();
     expect(matchAnswer("", choices)).toBeNull();
-    expect(recognitionPhrases(choices)).toEqual(["blue", "red", "3", "three"]);
+    expect(recognitionPhrases(choices)).toEqual(["blue", "red", "three"]);
     expect(recognitionPhrases(choices, true)).toContain("option two");
     expect(matchChoiceNumber("I choose option two", choices)).toBe("red");
     expect(matchChoiceNumber("1", choices)).toBe("blue");
@@ -41,7 +41,7 @@ describe("voice answers", () => {
     await act(async () => Promise.resolve());
     expect(stop).toHaveBeenCalledOnce();
     expect(onAnswer).toHaveBeenCalledWith("blue");
-    expect(coreClient.transcribe).toHaveBeenCalledWith(expect.objectContaining({ phrases: ["blue", "red", "3", "three"] }));
+    expect(coreClient.transcribe).toHaveBeenCalledWith(expect.objectContaining({ phrases: ["blue", "red", "three"] }));
   });
   it("stops after six and a half seconds and cancels on leaving the round", async () => {
     vi.useFakeTimers();

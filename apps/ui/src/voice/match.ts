@@ -5,9 +5,11 @@ const spokenNumbers = Object.fromEntries(Object.entries(numbers).map(([word, dig
 export function recognitionPhrases(choices: GeneratedQuestion["choices"], numberChoices = false): string[] {
   const positions = numberChoices ? choices.flatMap((_choice, index) => {
     const digit = String(index + 1), word = spokenNumbers[digit];
-    return [digit, word, `option ${digit}`, `option ${word}`];
+    return word ? [word, `option ${word}`] : [];
   }) : [];
-  return [...new Set([...choices.flatMap(choice => [choice.value, choice.label]).map(clean).filter(Boolean).flatMap(phrase => [phrase, spokenNumbers[phrase]].filter((value): value is string => Boolean(value))), ...positions].filter((value): value is string => Boolean(value)))];
+  const answers = choices.flatMap(choice => [choice.value, choice.label]).map(clean).filter(Boolean)
+    .map(phrase => spokenNumbers[phrase] ?? phrase);
+  return [...new Set([...answers, ...positions])];
 }
 
 export function matchChoiceNumber(text: string, choices: GeneratedQuestion["choices"]): string | null {
