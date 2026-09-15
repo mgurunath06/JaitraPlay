@@ -10,6 +10,18 @@ export const TWO_LETTER_WORDS = [
 ] as const;
 export const BUILD_WORDS = ["cat", "sun", "dog", "map", "bed", "cup", "hen", "top"];
 
+export function letterChoices(word: string, round: number, size = 6): string[] {
+  const target = [...new Set(word)];
+  const distractors = [..."aeiostbcdfghlmnpru"].filter(letter => !target.includes(letter));
+  const choices: string[] = [];
+  while (choices.length < size && (target.length || distractors.length)) {
+    if (target.length) choices.push(target.shift()!);
+    if (choices.length < size && distractors.length) choices.push(distractors.shift()!);
+  }
+  const shift = round % choices.length;
+  return [...choices.slice(shift), ...choices.slice(0, shift)];
+}
+
 export function focusTokens(value: string): string[] {
   return [...new Set(value.toLowerCase().split(/[^a-z]+/).filter(token => token.length >= 1 && token.length <= 4))].slice(0, 12);
 }

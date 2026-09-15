@@ -1,9 +1,19 @@
 import { expect, it } from "vitest";
 import type { Landmark } from "../camera/observe";
-import { airWritingScore, focusTokens, matchesBodyLetter, wristPoint } from "./literacy";
+import { BUILD_WORDS, airWritingScore, focusTokens, letterChoices, matchesBodyLetter, wristPoint } from "./literacy";
 
 it("prioritises clean, unique weekly literacy focus tokens", () => {
   expect(focusTokens("B, b, at; in! 123 longword")).toEqual(["b", "at", "in"]);
+});
+
+it("separates target letters among distractors in letter-card rounds", () => {
+  for (const [round, word] of BUILD_WORDS.entries()) {
+    const choices = letterChoices(word, round);
+    expect(choices).toHaveLength(6);
+    expect(new Set(choices)).toHaveLength(6);
+    expect(choices.join("")).not.toContain(word);
+    expect([...new Set(word)].every(letter => choices.includes(letter))).toBe(true);
+  }
 });
 
 it("scores a recognisable air-written C and rejects too few points", () => {
