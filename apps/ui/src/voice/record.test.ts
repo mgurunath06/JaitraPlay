@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from "vitest";
-import { captureQuality, downsampleVoice, highPassVoice, recordVoice, speechRegion } from "./record";
+import { captureQuality, downsampleVoice, highPassVoice, magnitudePercentile, recordVoice, speechRegion } from "./record";
 
 afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 
@@ -7,7 +7,7 @@ function microphone() {
   const trackStop = vi.fn();
   const close = vi.fn().mockResolvedValue(undefined);
   const disconnect = vi.fn();
-  const port = { onmessage: null as ((event: { data: { samples: Float32Array; channel: number; channels: number } }) => void) | null };
+  const port = { onmessage: null as ((event: { data: { channels: Float32Array[] } }) => void) | null };
   const contextOptions = vi.fn();
   const track = { stop: trackStop, label: "EMEET test", muted: false, enabled: true, getSettings: () => ({ sampleRate: 48000, channelCount: 2 }) };
   vi.stubGlobal("navigator", { mediaDevices: { getUserMedia: vi.fn().mockResolvedValue({ getTracks: () => [track], getAudioTracks: () => [track] }) } });
@@ -31,7 +31,7 @@ function microphone() {
 it("cleans and normalises native-rate PCM and releases the microphone after stopping", async () => {
   const device = microphone();
   const recording = await recordVoice(new AbortController().signal);
-  device.port.onmessage?.({ data: { samples: new Float32Array([0.5, -0.5, 0.5, -0.5, 0.5, -0.5]), channel: 2, channels: 2 } });
+  device.port.onmessage?.({ data: { channels: [new Float32Array(6), new Float32Array([0.5, -0.5, 0.5, -0.5, 0.5, -0.5])] } });
   const result = await recording.stop();
   expect(result.sampleRate).toBe(16000);
   expect(atob(result.audio)).toHaveLength(4);
@@ -44,7 +44,7 @@ it("cleans and normalises native-rate PCM and releases the microphone after stop
 it.each([false, true])("distinguishes absent audio from silence and still releases devices (%s)", async (sendSilence) => {
   const device = microphone();
   const recording = await recordVoice(new AbortController().signal);
-  if (sendSilence) device.port.onmessage?.({ data: { samples: new Float32Array(128), channel: 1, channels: 1 } });
+  if (sendSilence) device.port.onmessage?.({ data: { channels: [new Float32Array(128)] } });
   await expect(recording.stop()).rejects.toThrow(sendSilence ? "sent silence" : "sent no audio");
   expect(device.trackStop).toHaveBeenCalledOnce();
   expect(device.close).toHaveBeenCalledOnce();
@@ -57,6 +57,16 @@ it("releases capture on abort without requiring a stop", async () => {
   controller.abort();
   expect(device.trackStop).toHaveBeenCalledOnce();
   expect(device.port.onmessage).toBeNull();
+});
+
+it("selects from the whole recording so late speech beats an initially noisy channel", async () => {
+  const device = microphone();
+  let selected = 0;
+  const recording = await recordVoice(new AbortController().signal, undefined, quality => { selected = quality.selectedChannel; });
+  device.port.onmessage?.({ data: { channels: [new Float32Array(128).fill(.006), new Float32Array(128)] } });
+  device.port.onmessage?.({ data: { channels: [new Float32Array(128).fill(.006), new Float32Array(128).fill(.2)] } });
+  await recording.stop();
+  expect(selected).toBe(2);
 });
 
 it("boosts quiet speech without boosting silence or clipping peaks", async () => {
@@ -96,6 +106,12 @@ it("trims around a short quiet word and ignores a single transient for gain limi
   expect(region.durationMs).toBeGreaterThanOrEqual(380);
   expect(region.speechRms).toBeGreaterThan(.015);
   expect(region.limitPeak).toBeLessThan(.1);
+});
+
+it("finds the limiting percentile without sorting the complete recording", () => {
+  const samples = new Float32Array(100_000).fill(.2);
+  samples[0] = 1;
+  expect(magnitudePercentile(samples, .999)).toBeCloseTo(.2, 3);
 });
 
 it("reports quiet, noisy and clipped input separately", () => {

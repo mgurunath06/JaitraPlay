@@ -128,9 +128,21 @@ export function speechRegion(samples: Float32Array, sampleRate: number, noiseRms
   const trimmed = samples.slice(start, end);
   levels.sort((a, b) => a - b);
   const speechRms = levels[Math.floor(levels.length * .7)] ?? captureQuality(samples, sampleRate).speechRms;
-  const magnitudes = Array.from(trimmed, Math.abs).sort((a, b) => a - b);
-  const limitPeak = magnitudes[Math.min(magnitudes.length - 1, Math.floor(magnitudes.length * .999))] ?? 0;
+  const limitPeak = magnitudePercentile(trimmed, .999);
   return { samples: trimmed, durationMs: Math.round(active.length * frameSize / sampleRate * 1000), speechRms, limitPeak };
+}
+
+export function magnitudePercentile(samples: Float32Array, fraction: number): number {
+  if (!samples.length) return 0;
+  const bins = new Uint32Array(4096);
+  for (const value of samples) bins[Math.min(bins.length - 1, Math.floor(Math.abs(value) * (bins.length - 1)))]++;
+  const target = Math.ceil(samples.length * fraction);
+  let count = 0;
+  for (let index = 0; index < bins.length; index++) {
+    count += bins[index];
+    if (count >= target) return index / (bins.length - 1);
+  }
+  return 1;
 }
 
 export async function recordVoice(signal: AbortSignal, onLevel?: (rms: number) => void, onQuality?: (quality: CaptureQuality) => void): Promise<Recording> {
@@ -153,7 +165,8 @@ export async function recordVoice(signal: AbortSignal, onLevel?: (rms: number) =
   // Use the device's rate; forcing 16 kHz can prevent a media stream from connecting.
   try { context = new AudioContext({ latencyHint: "interactive" }); }
   catch (error) { closeTracks(); throw error; }
-  const chunks: Float32Array[] = [];
+  const channelChunks: Float32Array[][] = [];
+  const channelEnergy: number[] = [];
   let source: MediaStreamAudioSourceNode | undefined;
   let node: AudioWorkletNode | undefined;
   let samples = 0;
@@ -163,7 +176,7 @@ export async function recordVoice(signal: AbortSignal, onLevel?: (rms: number) =
   if (!track) { closeTracks(); void context.close(); throw new CaptureError("The selected device did not provide an audio track."); }
   const actual = track?.getSettings?.();
   diagnostic("voice.device", {
-    device: track.label.slice(0, 80) || (deviceId ? "saved device" : "system default"),
+    selection: deviceId ? "saved device" : "system default",
     trackSampleRate: actual?.sampleRate ?? 0, contextSampleRate: context.sampleRate,
     channels: actual?.channelCount ?? 0, muted: track.muted, enabled: track.enabled,
     echoCancellation: actual?.echoCancellation ?? false, noiseSuppression: actual?.noiseSuppression ?? false,
@@ -188,19 +201,28 @@ export async function recordVoice(signal: AbortSignal, onLevel?: (rms: number) =
     node = new AudioWorkletNode(context, "pcm-capture", { channelCountMode: "max", channelInterpretation: "discrete" });
     source.channelCountMode = "max";
     source.channelInterpretation = "discrete";
-    let selectedChannel = 1, channelCount = actual?.channelCount ?? 1;
-    node.port.onmessage = (event: MessageEvent<{ samples: Float32Array; channel: number; channels: number }>) => {
+    let channelCount = actual?.channelCount ?? 1;
+    node.port.onmessage = (event: MessageEvent<{ channels: Float32Array[] }>) => {
       if (closed || samples >= context.sampleRate * 8) return;
-      selectedChannel = event.data.channel;
-      channelCount = event.data.channels;
-      const frame = event.data.samples.subarray(0, context.sampleRate * 8 - samples);
-      chunks.push(frame);
-      samples += frame.length;
+      channelCount = event.data.channels.length;
+      const length = Math.min(event.data.channels[0]?.length ?? 0, context.sampleRate * 8 - samples);
+      for (let channel = 0; channel < event.data.channels.length; channel++) {
+        const frame = event.data.channels[channel].subarray(0, length);
+        (channelChunks[channel] ??= []).push(frame);
+        let energy = channelEnergy[channel] ?? 0;
+        for (const value of frame) energy += value * value;
+        channelEnergy[channel] = energy;
+      }
+      samples += length;
       let frameSquares = 0;
-      for (const sample of frame) frameSquares += sample * sample;
+      for (const frame of event.data.channels) {
+        let energy = 0;
+        for (let index = 0; index < length; index++) energy += frame[index] * frame[index];
+        frameSquares = Math.max(frameSquares, energy);
+      }
       if (samples - lastMeter >= context.sampleRate / 10) {
         lastMeter = samples;
-        onLevel?.(Math.sqrt(frameSquares / Math.max(1, frame.length)));
+        onLevel?.(Math.sqrt(frameSquares / Math.max(1, length)));
       }
     };
     source.connect(node);
@@ -211,10 +233,11 @@ export async function recordVoice(signal: AbortSignal, onLevel?: (rms: number) =
       stop: async () => {
         cancel();
         if (!samples) throw new CaptureError("The microphone opened but sent no audio. Check the selected microphone and system input settings.");
+        const selected = channelEnergy.reduce((best, value, index, all) => value > all[best] ? index : best, 0);
         const joined = new Float32Array(samples);
         let offset = 0;
-        for (const chunk of chunks) { joined.set(chunk.subarray(0, samples - offset), offset); offset += Math.min(chunk.length, samples - offset); }
-        chunks.length = 0;
+        for (const chunk of channelChunks[selected]) { joined.set(chunk.subarray(0, samples - offset), offset); offset += Math.min(chunk.length, samples - offset); }
+        channelChunks.length = 0;
         const rawQuality = captureQuality(joined, context.sampleRate);
         if (rawQuality.peak < 1 / 32768) throw new CaptureError("The microphone sent silence. Check mute, input volume, and the selected microphone in Setup.");
         const cleaned = highPassVoice(joined, context.sampleRate);
@@ -226,14 +249,14 @@ export async function recordVoice(signal: AbortSignal, onLevel?: (rms: number) =
         const resultQuality = {
           ...quality, speechRms: region.speechRms, speechDurationMs: region.durationMs,
           clippedPercent: rawQuality.clippedPercent, dcOffset: rawQuality.dcOffset,
-          snrDb, selectedChannel, channels: channelCount, gain,
+          snrDb, selectedChannel: selected + 1, channels: channelCount, gain,
         };
         diagnostic("voice.capture.finish", {
           samples, inputSampleRate: context.sampleRate, outputSampleRate: 16000,
           peak: quality.peak, rms: quality.rms, speechRms: region.speechRms, noiseRms: quality.noiseRms,
           snrDb: Math.round(snrDb * 10) / 10, clippedPercent: Math.round(rawQuality.clippedPercent * 100) / 100,
           dcOffset: rawQuality.dcOffset, speechDurationMs: region.durationMs,
-          selectedChannel, channels: channelCount, gain,
+          selectedChannel: selected + 1, channels: channelCount, gain,
           durationMs: Math.round(samples / context.sampleRate * 1000), quality: quality.message,
         });
         onQuality?.({ ...resultQuality, message: rawQuality.clippedPercent >= 1 ? "Input is clipping. Lower the Ubuntu microphone input volume." : quality.message });

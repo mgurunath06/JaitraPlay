@@ -192,21 +192,23 @@ expected by the speech model. Optional browser echo cancellation, noise suppress
 automatic gain control are selected in Setup. These remain off by default to avoid
 double-processing conference microphones. A live meter shows incoming sound; quiet PCM
 receives bounded gain up to 8x based on active speech frames rather than the silence around
-the word. For multichannel inputs, capture buffers a 250 ms warm-up, selects its strongest
-channel once, then uses that channel for the whole utterance instead of switching every frame.
+the word. For multichannel inputs, capture preserves every discrete channel and selects the
+strongest one once from the complete utterance, so room tone cannot lock out later speech.
 The microphone tracks and audio context are closed after capture.
 
-Local diagnostics record the selected track label, track and audio-context sample rates,
-channel count, the browser processing settings actually applied, peak and RMS levels,
+Local diagnostics record whether the saved or system-default input was requested (never its
+label or device ID), track and audio-context sample rates, channel count, selected channel,
+the browser processing settings actually applied, peak and RMS levels,
 estimated speech and noise RMS, signal-to-noise ratio, clipped-sample percentage, gain,
 duration and the 16 kHz output rate. No audio is stored. A clipping warning means lower the
 Ubuntu input volume; a quiet warning means check the selected input, mute and input volume;
 a low signal-to-noise warning means move closer or reduce room noise. A “sent silence”
 message means check mute/input volume; “sent no audio” means the capture pipeline delivered
 no samples. A recognition failure means check the core/model, whereas an empty transcript
-means the recognizer found no words. If a generated constrained vocabulary cannot be loaded
-by Vosk, recognition falls back to its full English vocabulary and the UI still accepts only
-an answer shown on screen.
+means the recognizer found no words. Before applying a constrained vocabulary, the core checks
+every word with Vosk's model lookup. If any word is out of vocabulary—or that lookup is not
+available—the entire request uses free English recognition and logs that decision; the UI
+still accepts only an answer shown on screen.
 Setup saves text aliases only; it cannot learn a voice from an empty transcript.
 
 For an explicit offline microphone sample, close JAITRA Play and run
@@ -214,7 +216,8 @@ For an explicit offline microphone sample, close JAITRA Play and run
 terminal. It records
 ten seconds from the system-default ALSA input and creates a ZIP under
 `.local/voice-samples/` containing the WAV, device metadata, metrics and a transcript for each
-captured channel. It requests two channels and retries with mono if the device rejects that.
+captured channel. It probes the selected ALSA device for its maximum channel count and steps
+down only if that layout is rejected; `--channels N` overrides the probe.
 This diagnostic action
 does save the spoken audio; listen to it and confirm it is safe before sharing it. Use
 `--device DEVICE` only when testing a non-default device shown by `arecord -l`.

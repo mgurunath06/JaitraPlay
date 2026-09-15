@@ -25,7 +25,6 @@ class VoiceService:
         self.model_path = model_path
         self.enabled = enabled
         self._model: Any = None
-        self._words: set[str] | None = None
         self._lock = threading.Lock()
         self.available = False
 
@@ -43,13 +42,6 @@ class VoiceService:
             vosk = importlib.import_module("vosk")
             vosk.SetLogLevel(-1)
             self._model = vosk.Model(str(self.model_path))
-            words_path = self.model_path / "graph" / "words.txt"
-            if words_path.is_file():
-                self._words = {
-                    line.rsplit(maxsplit=1)[0]
-                    for line in words_path.read_text(encoding="utf-8").splitlines()
-                    if line.strip()
-                }
             self.available = True
         except Exception as exc:
             log_event(
@@ -87,25 +79,17 @@ class VoiceService:
             raise VoiceUnavailable("VOICE_BUSY")
         try:
             vosk = importlib.import_module("vosk")
-            grammar, dropped = self._grammar(phrases or [])
-            if dropped:
+            grammar, decision = self._grammar(phrases or [])
+            if phrases:
                 log_event(
-                    logging.getLogger(__name__), logging.WARNING, "VOICE_GRAMMAR_FILTERED",
-                    "voice", payload={"kept": len(grammar), "dropped": dropped},
+                    logging.getLogger(__name__), logging.INFO, "VOICE_GRAMMAR_DECISION",
+                    "voice", payload={"mode": decision, "phrases": len(grammar)},
                 )
-            if grammar:
-                try:
-                    recognizer = vosk.KaldiRecognizer(
-                        self._model, sample_rate, json.dumps([*grammar, "[unk]"])
-                    )
-                except Exception as exc:
-                    log_event(
-                        logging.getLogger(__name__), logging.WARNING, "VOICE_GRAMMAR_FALLBACK",
-                        "voice", reason_code=type(exc).__name__,
-                    )
-                    recognizer = vosk.KaldiRecognizer(self._model, sample_rate)
-            else:
-                recognizer = vosk.KaldiRecognizer(self._model, sample_rate)
+            recognizer = (
+                vosk.KaldiRecognizer(self._model, sample_rate, json.dumps([*grammar, "[unk]"]))
+                if grammar
+                else vosk.KaldiRecognizer(self._model, sample_rate)
+            )
             parts: list[str] = []
             for offset in range(0, len(audio), 8000):
                 if recognizer.AcceptWaveform(audio[offset : offset + 8000]):
@@ -136,20 +120,23 @@ class VoiceService:
         finally:
             self._lock.release()
 
-    def _grammar(self, phrases: list[str]) -> tuple[list[str], int]:
+    def _grammar(self, phrases: list[str]) -> tuple[list[str], str]:
         numbers = {
             "0": "zero", "1": "one", "2": "two", "3": "three", "4": "four",
             "5": "five", "6": "six", "7": "seven", "8": "eight", "9": "nine",
             "10": "ten",
         }
         cleaned = []
-        dropped = 0
         for phrase in phrases[:40]:
             value = re.sub(r"[^a-z0-9' ]", " ", phrase.casefold())
             value = " ".join(numbers.get(token, token) for token in value.split())[:40]
-            if self._words is not None and any(token not in self._words for token in value.split()):
-                dropped += 1
-                continue
             if value and value not in cleaned:
                 cleaned.append(value)
-        return cleaned, dropped
+        if not cleaned:
+            return [], "free_empty"
+        find_word = getattr(self._model, "vosk_model_find_word", None)
+        if not callable(find_word):
+            return [], "free_vocabulary_check_unavailable"
+        if any(find_word(token) == -1 for phrase in cleaned for token in phrase.split()):
+            return [], "free_oov"
+        return cleaned, "constrained"

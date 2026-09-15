@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import re
 import shutil
 import subprocess
 import sys
@@ -21,6 +22,23 @@ def command_output(command: list[str]) -> str:
         return subprocess.run(command, check=False, capture_output=True, text=True).stdout.strip()
     except OSError as exc:
         return f"unavailable: {type(exc).__name__}"
+
+
+def detect_channels(device: str) -> int:
+    try:
+        result = subprocess.run(
+            [
+                "arecord", "-D", device, "--dump-hw-params", "-q", "-t", "raw",
+                "-f", "S16_LE", "-r", "48000", "-d", "1", "/dev/null",
+            ],
+            check=False, capture_output=True, text=True,
+        )
+    except OSError:
+        return 1
+    details = f"{result.stdout}\n{result.stderr}"
+    ranged = re.search(r"CHANNELS:\s*\[\s*\d+\s+(\d+)\s*\]", details)
+    fixed = re.search(r"CHANNELS:\s*(\d+)", details)
+    return max(1, min(8, int((ranged or fixed).group(1)))) if ranged or fixed else 1
 
 
 def read_wave(path: Path) -> tuple[list[array[int]], int, int, int]:
@@ -89,8 +107,13 @@ def transcribe_channels(path: Path, model_path: Path) -> list[str] | str:
     transcripts = []
     for values in separated:
         recognizer = vosk.KaldiRecognizer(model, rate)
-        recognizer.AcceptWaveform(values.tobytes())
-        transcripts.append(str(json.loads(recognizer.FinalResult()).get("text", "")))
+        audio = values.tobytes()
+        parts = []
+        for offset in range(0, len(audio), 8000):
+            if recognizer.AcceptWaveform(audio[offset : offset + 8000]):
+                parts.append(str(json.loads(recognizer.Result()).get("text", "")))
+        parts.append(str(json.loads(recognizer.FinalResult()).get("text", "")))
+        transcripts.append(" ".join(part for part in parts if part).strip())
     return transcripts
 
 
@@ -100,7 +123,10 @@ def main() -> int:
         "--device", default="default", help="ALSA capture device (default: default)"
     )
     parser.add_argument("--seconds", type=int, default=10, choices=range(5, 31))
-    parser.add_argument("--channels", type=int, default=2, choices=range(1, 9))
+    parser.add_argument(
+        "--channels", type=int, default=0, choices=range(0, 9),
+        help="channel count; 0 probes the selected ALSA device (default: 0)",
+    )
     parser.add_argument(
         "--model", default=".local/models/vosk-model-small-en-us-0.15",
         help="Vosk model path relative to the repository",
@@ -117,9 +143,15 @@ def main() -> int:
     target.mkdir(parents=True, exist_ok=False)
     wav = target / "voice-sample.wav"
     print("This opt-in diagnostic SAVES audio locally.")
+    if not args.channels:
+        print("Probing the selected device's channel layout for one second (audio is discarded)...")
+    channels = args.channels or detect_channels(args.device)
     print("For the first 2 seconds stay quiet, then have the child say:")
     print('  “Mimo. Blue. Red. Three. Elephant. Circle. A. Is. It. We. My. Go. He. Up.”')
-    print(f"Recording {args.seconds} seconds from ALSA device {args.device!r}...")
+    print(
+        f"Recording {args.seconds} seconds from ALSA device {args.device!r} "
+        f"({channels} channel(s))..."
+    )
     def record(channels: int) -> subprocess.CompletedProcess[str]:
         return subprocess.run(
             [
@@ -129,15 +161,17 @@ def main() -> int:
             check=False, capture_output=True, text=True,
         )
 
-    result = record(args.channels)
-    if result.returncode and args.channels > 1:
-        print(f"The device rejected {args.channels} channels; retrying with one channel.")
-        result = record(1)
+    result = record(channels)
+    while result.returncode and channels > 1:
+        channels -= 1
+        print(f"The device rejected the requested layout; retrying with {channels} channel(s).")
+        result = record(channels)
     if result.returncode:
         print(result.stderr.strip() or "Microphone recording failed.", file=sys.stderr)
         return result.returncode
     metadata = {
         "createdAt": datetime.now(UTC).isoformat(), "requestedDevice": args.device,
+        "requestedChannels": args.channels or "auto", "capturedChannels": channels,
         "analysis": analyse(wav),
         "transcriptsPerChannel": transcribe_channels(
             wav, (root / args.model).resolve()
