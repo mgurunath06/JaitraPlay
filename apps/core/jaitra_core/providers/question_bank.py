@@ -16,11 +16,38 @@ from jaitra_core.providers.variety import local_question_candidates, repeats_que
 
 logger = logging.getLogger(__name__)
 
-QUESTION_ACTIVITIES = ("picture_guess", "colours_shapes", "memory_cards", "riddle_guess")
+QUESTION_ACTIVITIES = (
+    "picture_guess",
+    "colours_shapes",
+    "memory_cards",
+    "riddle_guess",
+    "rhyme_time",
+    "good_manners",
+    "counting_numbers",
+    "shapes_sorting",
+    "animal_sounds",
+    "daily_routine",
+)
 MINIMUM_UNDISPLAYED_PER_ACTIVITY = 200
-REFILL_TARGET_PER_ACTIVITY = 220
-MAXIMUM_QUESTIONS = 1000
+REFILL_TARGET_PER_ACTIVITY = 205
+NEW_ACTIVITY_MINIMUM = 70
+NEW_ACTIVITY_TARGET = 90
+MAXIMUM_QUESTIONS = 1500
 BANK_VERSION = 5
+
+
+def minimum_for(activity: str) -> int:
+    return (
+        MINIMUM_UNDISPLAYED_PER_ACTIVITY
+        if activity in QUESTION_ACTIVITIES[:4]
+        else NEW_ACTIVITY_MINIMUM
+    )
+
+
+def target_for(activity: str) -> int:
+    return (
+        REFILL_TARGET_PER_ACTIVITY if activity in QUESTION_ACTIVITIES[:4] else NEW_ACTIVITY_TARGET
+    )
 
 
 class QuestionBank:
@@ -43,9 +70,7 @@ class QuestionBank:
             self._refill_locked()
             self._save_locked()
         self._stop_event.clear()
-        self._worker = threading.Thread(
-            target=self._run, name="question-bank-builder", daemon=True
-        )
+        self._worker = threading.Thread(target=self._run, name="question-bank-builder", daemon=True)
         self._worker.start()
 
     def stop(self) -> None:
@@ -71,7 +96,7 @@ class QuestionBank:
                 not entry["displayed"] and entry["question"]["activityId"] == activity_id
                 for entry in self._entries
             )
-            if activity_unseen <= MINIMUM_UNDISPLAYED_PER_ACTIVITY:
+            if activity_unseen <= minimum_for(activity_id):
                 self._refill_locked()
                 unseen = [
                     entry
@@ -86,7 +111,8 @@ class QuestionBank:
                 # needs to run. Reuse its oldest displayed question only then.
                 unseen = sorted(
                     (
-                        entry for entry in self._entries
+                        entry
+                        for entry in self._entries
                         if entry["question"]["activityId"] == activity_id
                         and entry["question"].get("topic") == topic
                     ),
@@ -108,7 +134,10 @@ class QuestionBank:
                         recent_prompts,
                     )
                 ),
-                unseen[0],
+                next(
+                    (item for item in unseen if item["question"]["prompt"] not in recent_prompts),
+                    unseen[0],
+                ),
             )
             entry["displayed"] = True
             entry["displayedAt"] = self._now()
@@ -117,7 +146,7 @@ class QuestionBank:
             return GeneratedQuestion.model_validate(entry["question"])
 
     def record_displayed(self, question: GeneratedQuestion) -> None:
-        """Include a directly-served AI question in the shared 1,000-record cap."""
+        """Include a directly-served AI question in the shared bank cap."""
         with self._condition:
             if not self._make_room_locked():
                 raise RuntimeError("question bank cap leaves no room for displayed question")
@@ -141,8 +170,7 @@ class QuestionBank:
         with self._condition:
             undisplayed = {
                 activity: sum(
-                    not entry["displayed"]
-                    and entry["question"]["activityId"] == activity
+                    not entry["displayed"] and entry["question"]["activityId"] == activity
                     for entry in self._entries
                 )
                 for activity in QUESTION_ACTIVITIES
@@ -154,6 +182,9 @@ class QuestionBank:
                 "undisplayed": sum(undisplayed.values()),
                 "undisplayedByActivity": undisplayed,
                 "minimumUndisplayedPerActivity": MINIMUM_UNDISPLAYED_PER_ACTIVITY,
+                "minimumUndisplayedByActivity": {
+                    activity: minimum_for(activity) for activity in QUESTION_ACTIVITIES
+                },
                 "maximumQuestions": MAXIMUM_QUESTIONS,
             }
 
@@ -171,11 +202,10 @@ class QuestionBank:
     def _needs_refill_locked(self) -> bool:
         return any(
             sum(
-                not entry["displayed"]
-                and entry["question"]["activityId"] == activity
+                not entry["displayed"] and entry["question"]["activityId"] == activity
                 for entry in self._entries
             )
-            <= MINIMUM_UNDISPLAYED_PER_ACTIVITY
+            <= minimum_for(activity)
             for activity in QUESTION_ACTIVITIES
         )
 
@@ -184,16 +214,13 @@ class QuestionBank:
         for activity in QUESTION_ACTIVITIES:
             all_candidates = local_question_candidates(activity)
             unseen_count = sum(
-                not entry["displayed"]
-                and entry["question"]["activityId"] == activity
+                not entry["displayed"] and entry["question"]["activityId"] == activity
                 for entry in self._entries
             )
-            while unseen_count < REFILL_TARGET_PER_ACTIVITY:
+            while unseen_count < target_for(activity):
                 prompts = {str(entry["question"]["prompt"]) for entry in self._entries}
                 available = [
-                    question
-                    for question in all_candidates
-                    if question.prompt not in prompts
+                    question for question in all_candidates if question.prompt not in prompts
                 ]
                 if not available:
                     if not self._remove_oldest_displayed_locked(activity):
@@ -228,8 +255,7 @@ class QuestionBank:
     def _remove_surplus_undisplayed_locked(self) -> bool:
         counts = {
             activity: sum(
-                not entry["displayed"]
-                and entry["question"]["activityId"] == activity
+                not entry["displayed"] and entry["question"]["activityId"] == activity
                 for entry in self._entries
             )
             for activity in QUESTION_ACTIVITIES
@@ -238,7 +264,8 @@ class QuestionBank:
             entry
             for entry in self._entries
             if not entry["displayed"]
-            and counts[entry["question"]["activityId"]] > MINIMUM_UNDISPLAYED_PER_ACTIVITY
+            and counts[entry["question"]["activityId"]]
+            > minimum_for(entry["question"]["activityId"])
         ]
         if not candidates:
             return False

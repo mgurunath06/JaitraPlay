@@ -1,9 +1,50 @@
 # Ubuntu deployment handoff
 
-Last updated: September 11, 2026. This record combines the earlier verified
+Last updated: September 20, 2026. This record combines the earlier verified
 deployment handoff with command output supplied by the owner in this conversation.
 It is not evidence of a new remote inspection. See also `README.md` and `cloud.md`
 for application behavior and general setup.
+
+## Current development handover — September 20, 2026
+
+The user approved separate review of three prompts in the order A → C → B.
+Phase A is pushed in `d4dd3cb` with shuffle follow-up `008285b`. Phase C is
+pushed in `d587b01`, reviewed by the user, and its full suites passed (83 core,
+126 UI). The original three prompts are in
+`/home/jaitra/.codex/attachments/c56df1b4-cb34-4005-b154-0c8a7cd8e4c3/pasted-text.txt`.
+The Phase C review is in
+`/home/jaitra/.codex/attachments/d161e2c8-291f-4607-aba3-849185a00aa4/pasted-text.txt`.
+
+Phase B adds six locally generated quizzes through the existing
+`GeneratedQuestion` and `PlayApp` pipeline: `rhyme_time`, `good_manners`,
+`counting_numbers`, `shapes_sorting`, `animal_sounds`, and `daily_routine`.
+They require only taps. The owner explicitly chose to retain the existing
+optional microphone answer control when voice input is enabled. These games
+never use an online question provider. The catalog and Phase C shelf sections
+include all six. The generated pools have 160, 240, 184, 168, 150, and 180
+distinct prompts respectively. Tests check choice validity and factual answers,
+including counting, comparisons, rhymes, animal sounds, and the odd shape.
+
+The question bank cap is 1,500, as the owner authorized. `BANK_VERSION` remains
+5 because the schema did not change. It targets 205 unseen questions per original
+game and 90 per new game, with refill thresholds of 200 and 70. Initial reserve
+is 1,360. When strict similarity filtering rejects all candidates, selection
+prefers a prompt absent from recent history. README reflects the new limits.
+
+Verification on this development checkout: targeted core tests passed (32),
+the full core suite passed (89), the full UI suite passed (127), Ruff and mypy
+passed, and UI lint and production build passed. Phase B is ready for the
+owner's review. Stop after Phase B for that review.
+
+The user also asked whether local language models could help and whether the
+Ubuntu desktop supports them. The reported desktop has an RTX 3050 6 GB,
+14 GiB usable RAM, and NVIDIA driver 595.84. Ollama's current
+[hardware support page](https://docs.ollama.com/gpu) lists RTX 3050 and
+requires driver 550+, so small local models are feasible in principle. No
+local language model has been installed or benchmarked on that desktop in
+this session. Curated deterministic questions remain the reliable default
+for Phase B; a small local model could be evaluated later for optional
+variety, with answer validation and latency measurements before child use.
 
 ## Working with the owner
 

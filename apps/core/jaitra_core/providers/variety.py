@@ -28,6 +28,45 @@ THEMES = {
     "nature": [("tree", "🌳"), ("flower", "🌻"), ("sun", "☀️"), ("moon", "🌙")],
     "animals": [("cat", "🐱"), ("dog", "🐶"), ("fish", "🐟"), ("butterfly", "🦋")],
 }
+RHYME_FAMILIES = (
+    (("cat", "🐱"), ("bat", "🦇"), ("hat", "🎩"), ("rat", "🐀")),
+    (("fan", "🪭"), ("can", "🥫"), ("pan", "🍳"), ("man", "👨")),
+    (("dog", "🐶"), ("frog", "🐸"), ("log", "🪵"), ("fog", "🌫️")),
+    (("cake", "🎂"), ("snake", "🐍"), ("lake", "🏞️"), ("rake", "🍂")),
+    (("bee", "🐝"), ("tree", "🌳"), ("key", "🔑"), ("sea", "🌊")),
+    (("car", "🚗"), ("star", "⭐"), ("jar", "🫙"), ("bar", "🍫")),
+    (("sun", "☀️"), ("run", "🏃"), ("fun", "🎉"), ("bun", "🍞")),
+    (("ball", "⚽"), ("wall", "🧱"), ("tall", "📏"), ("fall", "🍂")),
+    (("fish", "🐟"), ("dish", "🍽️"), ("wish", "🌠"), ("swish", "💨")),
+    (("book", "📖"), ("cook", "👩‍🍳"), ("look", "👀"), ("hook", "🪝")),
+)
+ANIMAL_SOUNDS = (
+    ("cow", "🐮", "moo"),
+    ("dog", "🐶", "woof"),
+    ("cat", "🐱", "meow"),
+    ("sheep", "🐑", "baa"),
+    ("duck", "🦆", "quack"),
+    ("pig", "🐷", "oink"),
+    ("horse", "🐴", "neigh"),
+    ("frog", "🐸", "ribbit"),
+    ("lion", "🦁", "roar"),
+    ("bird", "🐦", "tweet"),
+    ("bee", "🐝", "buzz"),
+    ("snake", "🐍", "hiss"),
+    ("owl", "🦉", "hoot"),
+    ("chicken", "🐔", "cluck"),
+    ("elephant", "🐘", "trumpet"),
+)
+SCHOOL_SHAPES = (
+    ("circle", "⚪"),
+    ("square", "🟦"),
+    ("triangle", "🔺"),
+    ("diamond", "🔶"),
+    ("star", "⭐"),
+    ("heart", "❤️"),
+    ("rectangle", "▭"),
+    ("oval", "🥚"),
+)
 RIDDLES = [
     ("umbrella", "☂️", "I open above your head to keep the rain off. What am I?"),
     ("clock", "🕒", "My hands move, but I cannot clap. I tell the time. What am I?"),
@@ -256,6 +295,12 @@ PROMPT_OPENERS = {
         "Mystery object: ",
         "Use the clues: ",
     ),
+    "rhyme_time": ("",),
+    "good_manners": ("",),
+    "counting_numbers": ("",),
+    "shapes_sorting": ("",),
+    "animal_sounds": ("",),
+    "daily_routine": ("",),
 }
 
 
@@ -490,6 +535,318 @@ def local_question_candidates(activity_id: str) -> list[GeneratedQuestion]:
                     f"pattern_{pictures[next_index][0]}",
                     f"The repeating part tells us {pictures[next_index][1]} comes next.",
                 )
+    elif activity_id == "rhyme_time":
+        phrasings = (
+            "Which word rhymes with {word}?",
+            "Find a word that sounds like {word} at the end.",
+            "Mimo says {word}. Which word rhymes?",
+            "Tap the rhyme for {word}.",
+        )
+        for family_index, family in enumerate(RHYME_FAMILIES):
+            for target_index, (target, _icon) in enumerate(family):
+                for style, phrasing in enumerate(phrasings):
+                    correct = family[(target_index + 1 + style % 3) % len(family)]
+                    distractors = [
+                        RHYME_FAMILIES[(family_index + shift) % len(RHYME_FAMILIES)][
+                            (target_index + style) % 4
+                        ]
+                        for shift in (1, 2, 3)
+                    ]
+                    add(
+                        phrasing.format(word=target),
+                        f"Listen to the end of {target}.",
+                        [(word, f"{emoji} {word}") for word, emoji in [correct, *distractors]],
+                        correct[0],
+                        f"{target} and {correct[0]} rhyme.",
+                    )
+    elif activity_id == "good_manners":
+        manners = (
+            ("gets a gift from a friend", "thank_you"),
+            ("is handed a shared toy", "thank_you"),
+            ("gets help carrying books", "thank_you"),
+            ("wants a turn with a toy", "please"),
+            ("asks for a glass of water", "please"),
+            ("wants to borrow a crayon", "please"),
+            ("accidentally bumps a friend", "sorry"),
+            ("spills water on a friend's drawing", "sorry"),
+            ("steps on someone's shoe", "sorry"),
+            ("needs to pass through a busy doorway", "excuse_me"),
+            ("wants a teacher's attention", "excuse_me"),
+            ("needs to move past someone in a line", "excuse_me"),
+        )
+        words = [
+            ("thank_you", "Thank you"),
+            ("please", "Please"),
+            ("sorry", "Sorry"),
+            ("excuse_me", "Excuse me"),
+        ]
+        manners_names = ("Maya", "Ari", "Leah", "Sam", "Nia")
+        endings = ("What could they say?", "Which kind words fit?", "Tap the kind words.")
+        for situation, manners_answer in manners:
+            for name in manners_names:
+                for ending in endings:
+                    add(
+                        f"{name} {situation}. {ending}",
+                        "Think about the kind words for this moment.",
+                        words,
+                        manners_answer,
+                        f"{dict(words)[manners_answer]} is kind to say here.",
+                    )
+        feelings = (("happy", "😊"), ("sad", "😢"), ("angry", "😠"), ("scared", "😨"))
+        feeling_choices = [(feeling, f"{emoji} {feeling}") for feeling, emoji in feelings]
+        for feeling, emoji in feelings:
+            for name in manners_names:
+                for ending in ("How do they feel?", "Which feeling matches?", "Tap the feeling."):
+                    add(
+                        f"{name} has this face {emoji}. {ending}",
+                        "Look at the eyes and mouth.",
+                        feeling_choices,
+                        feeling,
+                        f"{emoji} shows feeling {feeling}.",
+                    )
+    elif activity_id == "counting_numbers":
+        count_things = (
+            ("apple", "🍎"),
+            ("star", "⭐"),
+            ("duck", "🦆"),
+            ("ball", "⚽"),
+            ("flower", "🌼"),
+            ("car", "🚗"),
+            ("fish", "🐟"),
+            ("heart", "❤️"),
+        )
+        for thing, emoji in count_things:
+            for count in range(1, 10):
+                count_options = sorted({count, count + 1, count + 2, max(0, count - 1)})
+                add(
+                    f"How many {thing} pictures? {' '.join([emoji] * count)}",
+                    "Point to each picture once as you count.",
+                    [(str(number), str(number)) for number in count_options],
+                    str(count),
+                    f"There are {count} {thing} pictures.",
+                )
+        for number in range(10):
+            digit_options = [(str(value), str(value)) for value in range(number, number + 4)]
+            for phrasing in (
+                "Tap the number {number}.",
+                "Which digit is {number}?",
+                "Find {number} on the number cards.",
+                "Mimo says {number}. Which number is it?",
+            ):
+                add(
+                    phrasing.format(number=number),
+                    "Look at each number card.",
+                    digit_options,
+                    str(number),
+                    f"This is the number {number}.",
+                )
+        for first in range(1, 10):
+            for second in range(first + 1, 10):
+                extras = [number for number in range(1, 11) if number not in (first, second)][:2]
+                choices = [(str(number), str(number)) for number in (first, second, *extras)]
+                for comparison, comparison_answer in (("more", second), ("less", first)):
+                    add(
+                        f"Which is {comparison}, {first} or {second}?",
+                        "Count up from the smaller number.",
+                        choices,
+                        str(comparison_answer),
+                        f"{comparison_answer} is {comparison} than "
+                        f"{first if comparison_answer == second else second}.",
+                    )
+    elif activity_id == "shapes_sorting":
+        shape_phrasings = (
+            "Which shape is a {shape}?",
+            "Find the {shape}.",
+            "Tap the {shape} shape.",
+            "Mimo wants a {shape}. Which one?",
+            "Which picture looks like a {shape}?",
+        )
+        for shape, emoji in SCHOOL_SHAPES:
+            shape_others = [item for item in SCHOOL_SHAPES if item[0] != shape]
+            choices = [
+                (shape, f"{emoji} {shape}"),
+                *[(name, f"{icon} {name}") for name, icon in shape_others[:3]],
+            ]
+            for phrasing in shape_phrasings:
+                add(
+                    phrasing.format(shape=shape),
+                    "Look at the outline.",
+                    choices,
+                    shape,
+                    f"{emoji} is a {shape}.",
+                )
+            for odd_index, (odd_shape, odd_icon) in enumerate(shape_others):
+                odd_position = odd_index % 4
+                picture_icons = [emoji] * 4
+                picture_icons[odd_position] = odd_icon
+                add(
+                    f"Which shape is different? {' '.join(picture_icons)}",
+                    "Three shapes match. One does not.",
+                    [
+                        (str(position + 1), f"{position + 1}: {icon}")
+                        for position, icon in enumerate(picture_icons)
+                    ],
+                    str(odd_position + 1),
+                    f"The {odd_shape} in spot {odd_position + 1} is different "
+                    f"from the three {shape} shapes.",
+                )
+        opposites = (
+            ("big", "small"),
+            ("hot", "cold"),
+            ("up", "down"),
+            ("in", "out"),
+            ("open", "closed"),
+            ("day", "night"),
+            ("happy", "sad"),
+            ("full", "empty"),
+            ("wet", "dry"),
+            ("fast", "slow"),
+            ("clean", "dirty"),
+            ("loud", "quiet"),
+        )
+        all_opposites = [word for pair in opposites for word in pair]
+        for opposite_first, opposite_second in opposites:
+            for source, opposite_answer in (
+                (opposite_first, opposite_second),
+                (opposite_second, opposite_first),
+            ):
+                opposite_distractors = [
+                    word for word in all_opposites if word not in (source, opposite_answer)
+                ][:3]
+                opposite_choices = [
+                    (word, word.title()) for word in (opposite_answer, *opposite_distractors)
+                ]
+                for phrasing in (
+                    "What is the opposite of {word}?",
+                    "Mimo says {word}. Tap its opposite.",
+                    "Find a word that means the opposite of {word}.",
+                ):
+                    add(
+                        phrasing.format(word=source),
+                        "Think of the other side of the pair.",
+                        opposite_choices,
+                        opposite_answer,
+                        f"{opposite_answer.title()} is the opposite of {source}.",
+                    )
+    elif activity_id == "animal_sounds":
+        animal_phrasings = (
+            "Which animal says {sound}?",
+            "Who makes a {sound} sound?",
+            "Mimo hears {sound}. Find the animal.",
+            "Tap the animal that goes {sound}.",
+            "Which animal could Mimo hear saying {sound}?",
+        )
+        sound_phrasings = (
+            "What sound does a {animal} make?",
+            "A {animal} is talking. What do you hear?",
+            "Tap the sound of a {animal}.",
+            "Which sound belongs to a {animal}?",
+            "Mimo sees a {animal}. What does it say?",
+        )
+        for index, (animal, emoji, sound) in enumerate(ANIMAL_SOUNDS):
+            sound_others = [
+                ANIMAL_SOUNDS[(index + shift) % len(ANIMAL_SOUNDS)] for shift in (1, 2, 3)
+            ]
+            for phrasing in animal_phrasings:
+                add(
+                    phrasing.format(sound=sound),
+                    "Listen to the sound word.",
+                    [
+                        (animal, f"{emoji} {animal}"),
+                        *[(name, f"{icon} {name}") for name, icon, _ in sound_others],
+                    ],
+                    animal,
+                    f"The {animal} says {sound}.",
+                )
+            for phrasing in sound_phrasings:
+                add(
+                    phrasing.format(animal=animal),
+                    "Imagine the animal's voice.",
+                    [(sound, sound), *[(noise, noise) for _, _, noise in sound_others]],
+                    sound,
+                    f"The {animal} says {sound}.",
+                )
+    elif activity_id == "daily_routine":
+        situations = (
+            (
+                "just woke up",
+                "brush_teeth",
+                ("Brush teeth", "Go back to sleep", "Eat dinner", "Leave toys out"),
+            ),
+            (
+                "is about to eat",
+                "wash_hands",
+                ("Wash hands", "Put on shoes", "Go to bed", "Paint a picture"),
+            ),
+            (
+                "finished breakfast",
+                "put_plate_away",
+                ("Put the plate away", "Jump on the table", "Leave the plate", "Go to sleep"),
+            ),
+            (
+                "has muddy shoes",
+                "clean_shoes",
+                ("Clean the shoes", "Put them on the bed", "Hide them", "Touch the wall"),
+            ),
+            (
+                "sees rain before going outside",
+                "take_umbrella",
+                ("Take an umbrella", "Wear sunglasses", "Take a pillow", "Leave the coat"),
+            ),
+            (
+                "feels thirsty after playing",
+                "drink_water",
+                ("Drink water", "Go to sleep", "Shout loudly", "Hide the cup"),
+            ),
+            (
+                "finished playing with toys",
+                "tidy_toys",
+                ("Tidy the toys", "Leave toys on the floor", "Throw the toys", "Go outside alone"),
+            ),
+            (
+                "is ready to cross a road",
+                "look_both_ways",
+                ("Look both ways with a grown-up", "Run across", "Close eyes", "Play in the road"),
+            ),
+            (
+                "is getting ready for bed",
+                "brush_teeth",
+                ("Brush teeth", "Eat more sweets", "Start a loud game", "Put on outdoor shoes"),
+            ),
+            (
+                "came home from outside",
+                "wash_hands",
+                ("Wash hands", "Touch all the food", "Jump on the sofa", "Go out alone"),
+            ),
+            (
+                "spilled water on the floor",
+                "wipe_spill",
+                ("Wipe the spill with help", "Leave it slippery", "Run through it", "Hide the cup"),
+            ),
+            (
+                "feels cold before a walk",
+                "wear_coat",
+                ("Wear a coat", "Wear sandals", "Take a swim", "Open the freezer"),
+            ),
+        )
+        for situation, routine_answer, labels in situations:
+            routine_choices = [
+                (routine_answer, labels[0]),
+                *[(f"wrong_{index}", label) for index, label in enumerate(labels[1:], 1)],
+            ]
+            for name in ("Maya", "Ari", "Leah", "Sam", "Nia"):
+                for phrasing in (
+                    "{name} {situation}. What should happen next?",
+                    "What comes next when {name} {situation}?",
+                    "{name} {situation}. Choose the helpful next step.",
+                ):
+                    add(
+                        phrasing.format(name=name, situation=situation),
+                        "Pick the safe and helpful choice.",
+                        routine_choices,
+                        routine_answer,
+                        f"A helpful next step is: {labels[0].lower()}.",
+                    )
     else:
         raise ValueError("unsupported activity")
 

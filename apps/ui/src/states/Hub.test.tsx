@@ -49,3 +49,21 @@ it("honours saved game and section visibility and lets a grown-up change it", ()
   expect(screen.getByRole("button", { name: "Find the Pairs, available" })).toBeVisible();
   expect(screen.getByRole("heading", { name: /Stories & Time/ })).toBeVisible();
 });
+
+it("shows all six new local games in their shelf sections and opens a quiz", () => {
+  const newGames = [
+    ["counting_numbers", "Count It!", "🔢"],
+    ["shapes_sorting", "Shapes", "🔶"],
+    ["rhyme_time", "Sing & Rhyme", "🎵"],
+    ["good_manners", "Kind Words", "🤝"],
+    ["animal_sounds", "Animal Sounds", "🐮"],
+    ["daily_routine", "My Day", "🌞"],
+  ].map(([activityId, title, icon]) => ({ activityId, title, icon, description: "Tap to play", availability: "AVAILABLE" as const }));
+  render(<Hub activities={newGames} onPlayingChange={vi.fn()} homeRequest={0} />);
+  expect(screen.getByRole("heading", { name: /Letters & Numbers/ })).toBeVisible();
+  expect(screen.getByRole("heading", { name: /Songs & Kindness/ })).toBeVisible();
+  expect(screen.getByRole("heading", { name: /Stories & Time/ })).toBeVisible();
+  for (const game of newGames) expect(screen.getByRole("button", { name: `${game.title}, available` })).toBeVisible();
+  fireEvent.click(screen.getByRole("button", { name: "Count It!, available" }));
+  expect(screen.getByText("Count It!")).toBeVisible();
+});

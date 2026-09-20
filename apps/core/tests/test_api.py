@@ -26,7 +26,7 @@ def test_api_boot_and_idempotent_commands(config: AppConfig, repository_root: Pa
                 "voice": "DISABLED",
                 "camera": "CLIENT_MANAGED",
             }
-            assert len(snapshot["payload"]["activities"]) == 12
+            assert len(snapshot["payload"]["activities"]) == 18
             assert snapshot["payload"]["activities"][0]["activityId"] == "picture_guess"
             assert snapshot["payload"]["activities"][0]["availability"] == "AVAILABLE"
             assert snapshot["payload"]["activities"][1]["activityId"] == "memory_cards"
@@ -76,7 +76,7 @@ def test_hub_lists_registered_apps_without_a_manual_choice_limit(
     config.ui.max_hub_choices = 1
     runtime = CoreRuntime(config, repository_root=repository_root)
     activities = runtime.snapshot().payload.activities
-    assert len(activities) == 12
+    assert len(activities) == 18
     assert activities[-1].activity_id == "word_cards"
 
 

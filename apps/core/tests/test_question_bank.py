@@ -12,16 +12,30 @@ def test_bank_persists_a_reserve_for_every_activity(tmp_path: Path) -> None:
     try:
         stats = bank.stats()
         assert Path(str(stats["path"])).is_file()
-        assert stats["total"] == 880
-        assert stats["undisplayed"] == 880
-        assert set(stats["undisplayedByActivity"].values()) == {220}  # type: ignore[union-attr]
+        assert stats["total"] == 1360
+        assert stats["undisplayed"] == 1360
+        assert [
+            stats["undisplayedByActivity"][activity]
+            for activity in ("picture_guess", "colours_shapes", "memory_cards", "riddle_guess")
+        ] == [205] * 4  # type: ignore[index]
+        assert [
+            stats["undisplayedByActivity"][activity]
+            for activity in (
+                "rhyme_time",
+                "good_manners",
+                "counting_numbers",
+                "shapes_sorting",
+                "animal_sounds",
+                "daily_routine",
+            )
+        ] == [90] * 6  # type: ignore[index]
 
         history = []
         for _ in range(25):
             question = bank.take("picture_guess", history)
             history.insert(0, question)
         stats = bank.stats()
-        assert stats["total"] <= 1000
+        assert stats["total"] <= 1500
         assert stats["undisplayedByActivity"]["picture_guess"] >= 200  # type: ignore[index]
     finally:
         bank.stop()
@@ -29,7 +43,7 @@ def test_bank_persists_a_reserve_for_every_activity(tmp_path: Path) -> None:
     restarted = QuestionBank(tmp_path / "question-bank")
     restarted.start()
     try:
-        assert restarted.stats()["total"] <= 1000
+        assert restarted.stats()["total"] <= 1500
         assert restarted.stats()["displayed"] >= 25
     finally:
         restarted.stop()

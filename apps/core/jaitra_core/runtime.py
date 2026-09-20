@@ -70,6 +70,42 @@ APP_CATALOG = (
         "icon": "🕒",
     },
     {
+        "activity_id": "counting_numbers",
+        "title": "Count It!",
+        "description": "Count pictures and compare numbers.",
+        "icon": "🔢",
+    },
+    {
+        "activity_id": "shapes_sorting",
+        "title": "Shapes",
+        "description": "Find shapes, the odd one out and opposites.",
+        "icon": "🔶",
+    },
+    {
+        "activity_id": "rhyme_time",
+        "title": "Sing & Rhyme",
+        "description": "Find words that sound alike.",
+        "icon": "🎵",
+    },
+    {
+        "activity_id": "good_manners",
+        "title": "Kind Words",
+        "description": "Choose kind words and recognise feelings.",
+        "icon": "🤝",
+    },
+    {
+        "activity_id": "animal_sounds",
+        "title": "Animal Sounds",
+        "description": "Match animals with their sounds.",
+        "icon": "🐮",
+    },
+    {
+        "activity_id": "daily_routine",
+        "title": "My Day",
+        "description": "Choose what to do next each day.",
+        "icon": "🌞",
+    },
+    {
         "activity_id": "air_writing",
         "title": "Air Writing",
         "description": "Trace letters in the air and see your hand path glow.",
@@ -112,7 +148,20 @@ APP_CATALOG = (
         "icon": "🧩",
     },
 )
-QUESTION_ACTIVITY_IDS = {"picture_guess", "colours_shapes", "memory_cards", "riddle_guess"}
+LOCAL_ONLY_ACTIVITIES = {
+    "rhyme_time",
+    "good_manners",
+    "counting_numbers",
+    "shapes_sorting",
+    "animal_sounds",
+    "daily_routine",
+}
+QUESTION_ACTIVITY_IDS = {
+    "picture_guess",
+    "colours_shapes",
+    "memory_cards",
+    "riddle_guess",
+} | LOCAL_ONLY_ACTIVITIES
 
 
 class CoreRuntime:
@@ -131,9 +180,7 @@ class CoreRuntime:
         self.catalog = ContentCatalog(self._resolve(config.paths.content_dir))
         self.questions = AiQuestionService(repository_root)
         self.question_bank = QuestionBank(state_dir / "question-bank")
-        self.provider_availability = ProviderAvailabilityService(
-            self.questions, state_dir
-        )
+        self.provider_availability = ProviderAvailabilityService(self.questions, state_dir)
         self.storybooks = StorybookService(repository_root, state_dir)
         self._question_lock = asyncio.Lock()
         self.enabled_activities: list[str] = []
@@ -226,7 +273,11 @@ class CoreRuntime:
             # History belongs to the appliance, including questions from other games.
             recent = list(dict.fromkeys([item.prompt for item in history] + request.recent_prompts))
             adapted = request.model_copy(update={"recent_prompts": recent})
-            provider = self.provider_availability.available_provider
+            provider = (
+                None
+                if activity_id in LOCAL_ONLY_ACTIVITIES
+                else self.provider_availability.available_provider
+            )
             if provider is not None:
                 try:
                     question = await self.questions.generate_with(provider, activity_id, adapted)

@@ -355,11 +355,12 @@ generation later fails, that provider is removed and an active app may retry the
 app uses no provider health requests.
 
 The persistent fallback bank is `.local/state/question-bank/questions.json`. On startup it
-contains 220 unseen questions for each of the four question games. Its background builder
-refills a game before its unseen count can fall below 200. Displayed and unseen records share
-a hard cap of 1,000; the oldest displayed records are rotated out first. Current provider and
-bank counts are also available from `GET /api/v1/health` as `questionProvider` and
-`questionBank`.
+contains 205 unseen questions for each of the four original question games and 90 for each
+of the six local-only games. Its background builder refills the original games when their
+unseen count reaches 200 and the new games when it reaches 70. Displayed and unseen records
+share a hard cap of 1,500; the oldest displayed records are rotated out first. Current
+provider and bank counts are also available from `GET /api/v1/health` as `questionProvider`
+and `questionBank`.
 
 Run all `.claude` provider text checks independently of the app:
 
