@@ -95,3 +95,20 @@ it("keeps a valid answer among four choices for every tap quiz mode", async () =
     expect(question.choices.some(choice => choice.value === question.answer)).toBe(true);
   }
 });
+
+it("varies the answer position across ABC tap rounds", async () => {
+  let draw = 0;
+  vi.spyOn(Math, "random").mockImplementation(() => Math.floor(draw++ / 3) % 2 === 0 ? 0 : 0.999);
+  for (const activityId of ["abc_letters", "abc_sounds", "abc_blend"]) {
+    const positions = new Set<number>();
+    for (let round = 0; round < 24; round++) {
+      const question = await getAbcQuestion(activityId, { previousPrompt: null, neededHint: false, recentPrompts: [] });
+      const position = question.choices.findIndex(choice => choice.value === question.answer);
+      expect(position).toBeGreaterThanOrEqual(0);
+      positions.add(position);
+    }
+    expect(positions.size).toBeGreaterThan(1);
+    expect(positions.has(0)).toBe(true);
+    expect([...positions].some(position => position !== 0)).toBe(true);
+  }
+});

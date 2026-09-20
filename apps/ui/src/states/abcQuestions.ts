@@ -45,6 +45,15 @@ function candidates(activityId: TapMode): GeneratedQuestion[] {
   ));
 }
 
+function shuffleChoices(question: GeneratedQuestion): GeneratedQuestion {
+  const choices = [...question.choices];
+  for (let index = choices.length - 1; index > 0; index--) {
+    const swap = Math.floor(Math.random() * (index + 1));
+    [choices[index], choices[swap]] = [choices[swap], choices[index]];
+  }
+  return { ...question, choices };
+}
+
 export async function getAbcQuestion(activityId: string, request: QuestionRequest): Promise<GeneratedQuestion> {
   if (activityId !== "abc_letters" && activityId !== "abc_sounds" && activityId !== "abc_blend") {
     throw new Error("Unsupported ABC activity");
@@ -52,7 +61,7 @@ export async function getAbcQuestion(activityId: string, request: QuestionReques
   const options = candidates(activityId);
   const unseen = options.filter(option => !request.recentPrompts.includes(option.prompt));
   const pool = unseen.length ? unseen : options;
-  return pool[sequence++ % pool.length];
+  return shuffleChoices(pool[sequence++ % pool.length]);
 }
 
 export function abcQuestionSpeech(question: GeneratedQuestion): string {
