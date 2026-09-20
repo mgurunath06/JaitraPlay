@@ -20,7 +20,7 @@ QUESTION_ACTIVITIES = ("picture_guess", "colours_shapes", "memory_cards", "riddl
 MINIMUM_UNDISPLAYED_PER_ACTIVITY = 200
 REFILL_TARGET_PER_ACTIVITY = 220
 MAXIMUM_QUESTIONS = 1000
-BANK_VERSION = 2
+BANK_VERSION = 5
 
 
 class QuestionBank:
@@ -57,7 +57,7 @@ class QuestionBank:
             self._worker = None
 
     def take(
-        self, activity_id: str, history: list[GeneratedQuestion]
+        self, activity_id: str, history: list[GeneratedQuestion], topic: str | None = None
     ) -> GeneratedQuestion:
         with self._condition:
             unseen = [
@@ -65,19 +65,38 @@ class QuestionBank:
                 for entry in self._entries
                 if not entry["displayed"]
                 and entry["question"]["activityId"] == activity_id
+                and (topic is None or entry["question"].get("topic") == topic)
             ]
-            if len(unseen) <= MINIMUM_UNDISPLAYED_PER_ACTIVITY:
+            activity_unseen = sum(
+                not entry["displayed"] and entry["question"]["activityId"] == activity_id
+                for entry in self._entries
+            )
+            if activity_unseen <= MINIMUM_UNDISPLAYED_PER_ACTIVITY:
                 self._refill_locked()
                 unseen = [
                     entry
                     for entry in self._entries
                     if not entry["displayed"]
                     and entry["question"]["activityId"] == activity_id
+                    and (topic is None or entry["question"].get("topic") == topic)
                 ]
+            reused = not unseen and topic is not None
+            if reused:
+                # A small topic can run through its reserve before the general refill
+                # needs to run. Reuse its oldest displayed question only then.
+                unseen = sorted(
+                    (
+                        entry for entry in self._entries
+                        if entry["question"]["activityId"] == activity_id
+                        and entry["question"].get("topic") == topic
+                    ),
+                    key=lambda entry: str(entry["displayedAt"] or ""),
+                )
             if not unseen:
                 raise RuntimeError(f"question bank is empty for {activity_id}")
 
-            random.SystemRandom().shuffle(unseen)
+            if not reused:
+                random.SystemRandom().shuffle(unseen)
             recent_prompts = [question.prompt for question in history]
             entry = next(
                 (

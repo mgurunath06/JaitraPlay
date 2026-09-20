@@ -1,6 +1,6 @@
-import { reactMimo } from "../components/mimo";
+import { clearMimoAnswer, reactMimo, showMimoAnswer } from "../components/mimo";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import type { GeneratedQuestion } from "../../../../packages/contracts/src";
+import type { GeneratedQuestion, RiddleTopic } from "../../../../packages/contracts/src";
 import { VoiceAnswer } from "../voice/VoiceAnswer";
 import { coreClient } from "../app/coreClient";
 
@@ -18,11 +18,51 @@ const PROVIDER_LABELS: Record<GeneratedQuestion["provider"], string> = {
   local: "LOCAL",
 };
 
+const RIDDLE_TOPICS: { id: RiddleTopic; label: string }[] = [
+  { id: "objects", label: "Everyday objects" },
+  { id: "riddles", label: "Food & nature riddles" },
+  { id: "colours", label: "Colours" },
+  { id: "geography", label: "Geography" },
+  { id: "patterns", label: "Numbers & patterns" },
+];
+type TopicMix = Record<RiddleTopic, number>;
+const DEFAULT_MIX: TopicMix = { objects: 35, riddles: 20, colours: 15, geography: 10, patterns: 20 };
+const MIX_STORAGE_KEY = "jaitra-riddle-topic-mix";
+
+function validMix(value: unknown): value is TopicMix {
+  if (typeof value !== "object" || value === null) return false;
+  const mix = value as Record<string, unknown>;
+  return RIDDLE_TOPICS.every(({ id }) => typeof mix[id] === "number" && Number.isInteger(mix[id]) && mix[id] >= 0 && mix[id] <= 100)
+    && RIDDLE_TOPICS.reduce((sum, { id }) => sum + Number(mix[id]), 0) === 100;
+}
+
+function storedMix(): TopicMix {
+  try {
+    const value: unknown = JSON.parse(window.localStorage.getItem(MIX_STORAGE_KEY) ?? "null");
+    if (validMix(value)) return value;
+  } catch { /* Use the default mix when storage is unavailable. */ }
+  return DEFAULT_MIX;
+}
+
+function chooseTopic(mix: TopicMix, counts: TopicMix): RiddleTopic {
+  const total = RIDDLE_TOPICS.reduce((sum, { id }) => sum + counts[id], 0);
+  return RIDDLE_TOPICS.filter(({ id }) => mix[id] > 0).reduce((best, item) =>
+    (total + 1) * mix[item.id] / 100 - counts[item.id] > (total + 1) * mix[best.id] / 100 - counts[best.id] ? item : best
+  ).id;
+}
+
 export function PlayApp({ activity, onBack, voiceAvailable = false }: { activity: PlayableActivity; onBack: () => void; voiceAvailable?: boolean }) {
+  const isRiddle = activity.activityId === "riddle_guess";
+  const [mix, setMix] = useState<TopicMix>(storedMix);
+  const [draftMix, setDraftMix] = useState<TopicMix>(mix);
+  const mixRef = useRef(mix);
+  const topicCounts = useRef<TopicMix>({ objects: 0, riddles: 0, colours: 0, geography: 0, patterns: 0 });
+  const [showTopics, setShowTopics] = useState(isRiddle);
+  const [started, setStarted] = useState(!isRiddle);
   const [question, setQuestion] = useState<GeneratedQuestion | null>(null);
   const recentPrompts = useRef<string[]>([]);
   const requestSequence = useRef(0);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!isRiddle);
   const [error, setError] = useState(false);
   const [round, setRound] = useState(1);
   const [stars, setStars] = useState(0);
@@ -30,6 +70,7 @@ export function PlayApp({ activity, onBack, voiceAvailable = false }: { activity
 
   const loadQuestion = useCallback(async (previousPrompt: string | null, neededHint: boolean) => {
     const sequence = ++requestSequence.current;
+    const topic = isRiddle ? chooseTopic(mixRef.current, topicCounts.current) : undefined;
     setLoading(true);
     setError(false);
     try {
@@ -37,9 +78,11 @@ export function PlayApp({ activity, onBack, voiceAvailable = false }: { activity
         previousPrompt,
         neededHint,
         recentPrompts: recentPrompts.current,
+        ...(topic ? { topic } : {}),
       });
       if (sequence !== requestSequence.current) return;
       setQuestion(next);
+      if (topic) topicCounts.current[topic] += 1;
       recentPrompts.current = [...recentPrompts.current, next.prompt].slice(-10);
       setHintUsed(false);
     } catch {
@@ -47,16 +90,28 @@ export function PlayApp({ activity, onBack, voiceAvailable = false }: { activity
     } finally {
       if (sequence === requestSequence.current) setLoading(false);
     }
-  }, [activity.activityId]);
+  }, [activity.activityId, isRiddle]);
 
   useEffect(() => {
     // Defer one tick so StrictMode's discarded effect does not generate a paid round.
+    if (!started) return;
     const timer = window.setTimeout(() => void loadQuestion(null, false), 0);
     return () => { window.clearTimeout(timer); requestSequence.current += 1; };
-  }, [loadQuestion]);
+  }, [loadQuestion, started]);
+
+  const saveTopics = () => {
+    if (!validMix(draftMix)) return;
+    setMix(draftMix);
+    mixRef.current = draftMix;
+    topicCounts.current = { objects: 0, riddles: 0, colours: 0, geography: 0, patterns: 0 };
+    try { window.localStorage.setItem(MIX_STORAGE_KEY, JSON.stringify(draftMix)); } catch { /* The current game still uses the choice. */ }
+    setShowTopics(false);
+    if (!started) setStarted(true);
+  };
 
   const next = () => {
     reactMimo("start");
+    clearMimoAnswer();
     const previous = question?.prompt ?? null;
     setQuestion(null);
     setRound((value) => value + 1);
@@ -70,7 +125,23 @@ export function PlayApp({ activity, onBack, voiceAvailable = false }: { activity
       stars={stars}
       provider={question?.provider ?? null}
       onBack={onBack}
+      onTopics={isRiddle ? () => { setDraftMix(mix); setShowTopics(true); } : undefined}
     >
+      {showTopics && <div className="topic-menu" aria-label="Riddle topics">
+        <h2>Choose your topics</h2>
+        <p>Set an approximate mix for the next questions. Use 0% to leave a topic out.</p>
+        {RIDDLE_TOPICS.map(({ id, label }) => <label className="topic-row" key={id}>
+          <span>{label}</span>
+          <input type="number" min="0" max="100" step="5" value={draftMix[id]} onChange={(event) => setDraftMix((current) => ({ ...current, [id]: event.target.value === "" ? NaN : Number(event.target.value) }))} />
+          <span>%</span>
+        </label>)}
+        <p className="topic-total" role="status">Total: {RIDDLE_TOPICS.reduce((sum, { id }) => sum + (Number.isFinite(draftMix[id]) ? draftMix[id] : 0), 0)}% · Must equal 100%</p>
+        <div className="topic-actions">
+          {started && <button type="button" className="secondary-button" onClick={() => setShowTopics(false)}>Keep playing</button>}
+          <button type="button" className="next-button" disabled={!validMix(draftMix)} onClick={saveTopics}>{started ? "Save mix" : "Start playing"}</button>
+        </div>
+      </div>}
+      {!showTopics && <>
       {loading && <LoadingRound />}
       {error && (
         <div className="question-error" role="alert">
@@ -87,6 +158,7 @@ export function PlayApp({ activity, onBack, voiceAvailable = false }: { activity
           <QuizRound voiceAvailable={voiceAvailable} activityId={activity.activityId} question={question} hintUsed={hintUsed} onHint={() => { reactMimo("hint"); setHintUsed(true); }} onCorrect={() => setStars((value) => value + 1)} onNext={next} />
         )
       )}
+      </>}
     </GameShell>
   );
 }
@@ -97,6 +169,7 @@ function QuizRound({ activityId, question, hintUsed, onHint, onCorrect, onNext, 
   const choose = (value: string) => {
     if (choice !== null) return;
     setChoice(value);
+    showMimoAnswer(question);
     reactMimo(value === question.answer ? "correct" : "encourage");
     if (value === question.answer) onCorrect();
   };
@@ -139,7 +212,7 @@ function RoomHunt({ question, onNext }: { question: GeneratedQuestion; onNext: (
     <h2 className="game-question">{question.prompt}</h2>
     <p>{question.hint}</p>
     {!found ? <>
-      <button className="primary" onClick={() => { reactMimo("correct"); setFound(true); }}>I found one!</button>
+      <button className="primary" onClick={() => { showMimoAnswer(question); reactMimo("correct"); setFound(true); }}>I found one!</button>
       <button className="back-button" onClick={onNext}>Skip this hunt</button>
     </> : <div className="game-feedback success" role="status">
       <span>{question.explanation}</span>
@@ -148,7 +221,7 @@ function RoomHunt({ question, onNext }: { question: GeneratedQuestion; onNext: (
   </div>;
 }
 
-function GameShell({ activity, round, stars, provider, onBack, children }: { activity: PlayableActivity; round: number; stars: number; provider: GeneratedQuestion["provider"] | null; onBack: () => void; children: ReactNode }) {
+function GameShell({ activity, round, stars, provider, onBack, onTopics, children }: { activity: PlayableActivity; round: number; stars: number; provider: GeneratedQuestion["provider"] | null; onBack: () => void; onTopics?: () => void; children: ReactNode }) {
   const providerLabel = provider === null ? "CHECKING" : PROVIDER_LABELS[provider];
   return (
     <section className="panel game-panel" aria-labelledby="game-title">
@@ -156,6 +229,7 @@ function GameShell({ activity, round, stars, provider, onBack, children }: { act
         <button className="back-button game-back" type="button" onClick={onBack}><span aria-hidden="true">←</span> Exit to home</button>
         <span className="game-name" id="game-title"><span aria-hidden="true">{activity.icon}</span> {activity.title}</span>
         <span className="game-status">
+          {onTopics && <button className="topic-button" type="button" onClick={onTopics}>⚙ Topics</button>}
           <span className="provider-indicator" aria-label={`Question API: ${providerLabel}`}>API · {providerLabel}</span>
           <span className="score" aria-label={`${stars} stars`}>⭐ {stars}</span>
         </span>

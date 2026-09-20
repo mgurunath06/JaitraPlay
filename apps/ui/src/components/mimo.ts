@@ -1,7 +1,12 @@
+import type { GeneratedQuestion } from "../../../../packages/contracts/src";
 export type MimoMood = "greeting" | "start" | "correct" | "encourage" | "hint";
 export function reactMimo(mood: MimoMood) {
   window.dispatchEvent(new CustomEvent("mimo:react", { detail: mood }));
 }
+export function showMimoAnswer(question: GeneratedQuestion) {
+  window.dispatchEvent(new CustomEvent<GeneratedQuestion>("mimo:answer", { detail: question }));
+}
+export function clearMimoAnswer() { window.dispatchEvent(new Event("mimo:answer-clear")); }
 export function quietMimo() { window.speechSynthesis?.cancel(); }
 export function speakMimo(text: string) {
   const synthesis = window.speechSynthesis;

@@ -39,12 +39,16 @@ export interface GeneratedQuestion {
   explanation: string;
   provider: "mwapi" | "startupapi" | "openrouter" | "local";
   kind?: "quiz" | "memory" | "room_hunt";
+  topic?: RiddleTopic | null;
 }
+
+export type RiddleTopic = "riddles" | "objects" | "colours" | "geography" | "patterns";
 
 export interface QuestionRequest {
   previousPrompt: string | null;
   neededHint: boolean;
   recentPrompts: string[];
+  topic?: RiddleTopic;
 }
 
 export interface TranscriptionRequest {

@@ -33,6 +33,7 @@ class QuestionRequest(StrictModel):
     previous_prompt: str | None = Field(default=None, alias="previousPrompt", max_length=200)
     needed_hint: bool = Field(default=False, alias="neededHint")
     recent_prompts: list[str] = Field(default=[], alias="recentPrompts", max_length=10)
+    topic: Literal["riddles", "objects", "colours", "geography", "patterns"] | None = None
 
 
 class QuestionChoice(StrictModel):
@@ -50,6 +51,7 @@ class GeneratedQuestion(StrictModel):
     explanation: str = Field(min_length=1, max_length=180)
     provider: Literal["mwapi", "startupapi", "openrouter", "local"]
     kind: Literal["quiz", "memory", "room_hunt"] = "quiz"
+    topic: Literal["riddles", "objects", "colours", "geography", "patterns"] | None = None
 
 
 class TranscriptionRequest(StrictModel):

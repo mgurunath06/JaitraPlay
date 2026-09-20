@@ -53,6 +53,38 @@ def test_riddle_garden_has_a_large_mix_of_riddles_colours_and_geography() -> Non
     assert any("map" in prompt.casefold() for prompt in prompts)
     assert any("continent" in prompt.casefold() for prompt in prompts)
     assert any(any(choice.color for choice in question.choices) for question in questions)
+    assert {question.topic for question in questions} == {
+        "riddles", "objects", "colours", "geography", "patterns"
+    }
+    assert all(
+        question.topic == "objects"
+        for question in questions
+        if question.answer in {"comb", "chair"}
+    )
+    patterns = [question for question in questions if question.topic == "patterns"]
+    assert any("number comes next" in question.prompt for question in patterns)
+    assert any("this pattern" in question.prompt for question in patterns)
+    assert all(
+        question.answer in {choice.value for choice in question.choices}
+        for question in patterns
+    )
+
+
+def test_riddle_topic_request_is_enforced_offline(config: AppConfig, repository_root: Path) -> None:
+    async def exercise() -> None:
+        runtime = CoreRuntime(config, repository_root=repository_root)
+        runtime.start()
+        try:
+            for topic in ("riddles", "objects", "colours", "geography", "patterns"):
+                for _ in range(3):
+                    question = await runtime.generate_question(
+                        "riddle_guess", QuestionRequest(topic=topic)
+                    )
+                    assert question.topic == topic
+        finally:
+            runtime.stop()
+
+    anyio.run(exercise)
 
 
 def test_history_survives_restart_and_provider_duplicates(

@@ -289,6 +289,7 @@ def shuffle_question_choices(
 
 def local_question_candidates(activity_id: str) -> list[GeneratedQuestion]:
     candidates: list[GeneratedQuestion] = []
+    topic: str | None = None
 
     def add(
         prompt: str,
@@ -309,6 +310,7 @@ def local_question_candidates(activity_id: str) -> list[GeneratedQuestion]:
                     "explanation": explanation,
                     "provider": "local",
                     "kind": kind,
+                    "topic": topic if activity_id == "riddle_guess" else None,
                 }
             )
         )
@@ -404,7 +406,12 @@ def local_question_candidates(activity_id: str) -> list[GeneratedQuestion]:
                     "memory",
                 )
     elif activity_id == "riddle_guess":
+        topic = "riddles"
         for value, label, clue in RIDDLES:
+            if value not in {"apple", "banana", "carrot", "bread", "sun", "moon", "cloud"}:
+                topic = "objects"
+            else:
+                topic = "riddles"
             others = [(v, f"{emoji} {v}") for v, emoji, _ in RIDDLES if v != value]
             add(
                 clue,
@@ -413,6 +420,7 @@ def local_question_candidates(activity_id: str) -> list[GeneratedQuestion]:
                 value,
                 f"The answer is {label} {value}.",
             )
+        topic = "geography"
         geography_values = [(value, label) for value, label, *_rest in GEOGRAPHY]
         for index, (value, label, clue, hint, explanation) in enumerate(GEOGRAPHY):
             others = [item for item in geography_values if item[0] != value]
@@ -426,6 +434,7 @@ def local_question_candidates(activity_id: str) -> list[GeneratedQuestion]:
                 value,
                 explanation,
             )
+        topic = "colours"
         for index, (colour, _hex_value) in enumerate(COLOURS):
             others = [item for item in COLOURS if item[0] != colour]
             items = [
@@ -449,6 +458,38 @@ def local_question_candidates(activity_id: str) -> list[GeneratedQuestion]:
             candidates[-1].choices = [
                 QuestionChoice(value=item, label=name, color=palette[item]) for item, name in items
             ]
+        topic = "patterns"
+        for step in (1, 2, 3, 5):
+            for start in range(1, 14):
+                sequence = [start + step * index for index in range(4)]
+                answer = start + step * 4
+                if answer > 35:
+                    continue
+                options = sorted({answer - 2, answer - 1, answer, answer + 1})
+                add(
+                    f"What number comes next? {', '.join(map(str, sequence))}, ?",
+                    f"Count forward by {step} each time.",
+                    [(str(number), str(number)) for number in options],
+                    str(answer),
+                    f"Add {step} to {sequence[-1]} to get {answer}.",
+                )
+        picture_sets = (
+            (("red", "🔴"), ("blue", "🔵"), ("yellow", "🟡"), ("green", "🟢")),
+            (("sun", "☀️"), ("moon", "🌙"), ("star", "⭐"), ("cloud", "☁️")),
+            (("apple", "🍎"), ("banana", "🍌"), ("grapes", "🍇"), ("orange", "🍊")),
+            (("circle", "⚪"), ("square", "🟦"), ("triangle", "🔺"), ("diamond", "🔶")),
+        )
+        for pictures in picture_sets:
+            for order in ((0, 1, 0, 1, 0), (0, 0, 1, 0, 0), (0, 1, 2, 0, 1)):
+                next_index = 1 if order in ((0, 1, 0, 1, 0), (0, 0, 1, 0, 0)) else 2
+                icons = " ".join(pictures[index][1] for index in order)
+                add(
+                    f"What comes next in this pattern? {icons} ?",
+                    "Look for the part that repeats.",
+                    [(f"pattern_{name}", icon) for name, icon in pictures],
+                    f"pattern_{pictures[next_index][0]}",
+                    f"The repeating part tells us {pictures[next_index][1]} comes next.",
+                )
     else:
         raise ValueError("unsupported activity")
 

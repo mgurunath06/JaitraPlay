@@ -1,7 +1,7 @@
 import { act, cleanup, render, screen } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import { Companion } from "./Companion";
-import { reactMimo, speakMimo } from "./mimo";
+import { clearMimoAnswer, reactMimo, showMimoAnswer, speakMimo } from "./mimo";
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 it("greets and encourages without shaming an incorrect answer", () => {
   render(<Companion name="Mimo" />);
@@ -21,4 +21,16 @@ it("only speaks using a local voice and cancels when setup pauses audio", () => 
   act(() => reactMimo("correct")); expect(speak).toHaveBeenCalledOnce();
   act(() => { window.dispatchEvent(new Event("jaitra:pause-voice")); });
   expect(cancel).toHaveBeenCalledTimes(2);
+});
+it("shows a map and fact for a geography answer, then clears it", () => {
+  render(<Companion name="Mimo" />);
+  act(() => showMimoAnswer({
+    activityId: "riddle_guess", prompt: "Where is India?", hint: "South Asia",
+    choices: [{ value: "india", label: "🇮🇳 India", color: null }], answer: "india",
+    explanation: "India is in Asia.", provider: "local", topic: "geography",
+  }));
+  expect(screen.getByRole("img", { name: /map showing/i })).toBeVisible();
+  expect(screen.getByText(/India is in southern Asia/)).toBeVisible();
+  act(() => clearMimoAnswer());
+  expect(screen.queryByLabelText("Answer discovery")).not.toBeInTheDocument();
 });

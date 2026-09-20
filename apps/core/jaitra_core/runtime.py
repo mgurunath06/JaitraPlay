@@ -54,7 +54,7 @@ APP_CATALOG = (
     {
         "activity_id": "riddle_guess",
         "title": "Riddle & Discovery Garden",
-        "description": "Solve riddles and explore colours, geography and maps.",
+        "description": "Solve riddles and explore colours, maps and patterns.",
         "icon": "🌱",
     },
     {
@@ -214,6 +214,8 @@ class CoreRuntime:
     ) -> GeneratedQuestion:
         if activity_id not in QUESTION_ACTIVITY_IDS:
             raise QuestionGenerationError("unsupported activity")
+        if request.topic is not None and activity_id != "riddle_guess":
+            raise QuestionGenerationError("topics are only supported for riddles")
         async with self._question_lock:
             history = [
                 GeneratedQuestion.model_validate_json(raw)
@@ -225,18 +227,18 @@ class CoreRuntime:
             recent = list(dict.fromkeys([item.prompt for item in history] + request.recent_prompts))
             adapted = request.model_copy(update={"recent_prompts": recent})
             provider = self.provider_availability.available_provider
-            if provider is not None:
+            if provider is not None and request.topic is None:
                 try:
                     question = await self.questions.generate_with(provider, activity_id, adapted)
                     if repeats_question(question, history, recent):
-                        question = self.question_bank.take(activity_id, history)
+                        question = self.question_bank.take(activity_id, history, request.topic)
                     else:
                         self.question_bank.record_displayed(question)
                 except QuestionGenerationError:
                     self.provider_availability.mark_failed(provider)
-                    question = self.question_bank.take(activity_id, history)
+                    question = self.question_bank.take(activity_id, history, request.topic)
             else:
-                question = self.question_bank.take(activity_id, history)
+                question = self.question_bank.take(activity_id, history, request.topic)
             # Stored local riddles deliberately keep a canonical order. Randomize at
             # delivery so neither local nor provider questions reveal the answer by
             # always placing it in the first button.

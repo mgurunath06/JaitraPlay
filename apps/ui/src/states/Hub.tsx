@@ -1,4 +1,4 @@
-import { quietMimo, reactMimo } from "../components/mimo";
+import { clearMimoAnswer, quietMimo, reactMimo } from "../components/mimo";
 import { useEffect, useState } from "react";
 import { PlayApp, type PlayableActivity } from "./PlayApp";
 import { ClockApp } from "./ClockApp";
@@ -18,13 +18,13 @@ export function Hub({ activities, voiceAvailable = false, onPlayingChange, onSto
   const [selected, setSelected] = useState<Activity | null>(null);
 
   useEffect(() => { onPlayingChange(Boolean(selected)); return () => onPlayingChange(false); }, [selected, onPlayingChange]);
-  useEffect(() => { setSelected(null); quietMimo(); }, [homeRequest]);
+  useEffect(() => { setSelected(null); quietMimo(); clearMimoAnswer(); }, [homeRequest]);
   if (selected) {
     if (selected.activityId === "tell_time") return <ClockApp voiceAvailable={voiceAvailable} onBack={() => { quietMimo(); setSelected(null); }} />;
     if (selected.activityId === "storybook") {
       return <StorybookApp voiceAvailable={voiceAvailable} onReadingChange={onStoryReadingChange} onBack={() => { quietMimo(); setSelected(null); }} />;
     }
-    const back = () => { quietMimo(); setSelected(null); };
+    const back = () => { quietMimo(); clearMimoAnswer(); setSelected(null); };
     if (selected.activityId === "air_writing") return <AirWritingApp onBack={back} />;
     if (selected.activityId === "sound_hunt") return <SoundHuntApp voiceAvailable={voiceAvailable} onBack={back} />;
     if (selected.activityId === "co_reading") return <CoReadingApp voiceAvailable={voiceAvailable} onBack={back} />;
@@ -33,7 +33,7 @@ export function Hub({ activities, voiceAvailable = false, onPlayingChange, onSto
     if (selected.activityId === "two_letter_words") return <TwoLetterWordsApp voiceAvailable={voiceAvailable} onBack={back} />;
     if (selected.activityId === "word_cards") return <WordCardsApp onBack={back} />;
     if (selected.activityId === "memory_cards") return <MemoryApp onBack={back} />;
-    return <PlayApp voiceAvailable={voiceAvailable} activity={selected} onBack={() => { quietMimo(); setSelected(null); }} />;
+    return <PlayApp voiceAvailable={voiceAvailable} activity={selected} onBack={() => { quietMimo(); clearMimoAnswer(); setSelected(null); }} />;
   }
 
   return (
