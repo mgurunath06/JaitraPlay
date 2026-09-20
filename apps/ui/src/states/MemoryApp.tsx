@@ -65,7 +65,7 @@ export function MemoryApp({ onBack }: { onBack: () => void }) {
   return <section className="panel game-panel" aria-labelledby="memory-title">
     <div className="game-toolbar">
       <button className="back-button game-back" type="button" onClick={onBack}>← Exit to home</button>
-      <span className="game-name" id="memory-title">🧠 Memory Match</span>
+      <span className="game-name" id="memory-title">🃏 Find the Pairs</span>
       <span className="score" aria-label={`${stars} stars`}>⭐ {stars}</span>
     </div>
     <h2 className="game-question">Find every matching pair</h2>

@@ -7,7 +7,7 @@ import { AirWritingApp, BodyLettersApp, CoReadingApp, LetterLabelsApp, SoundHunt
 
 interface LettersWorldProps {
   activities: PlayableActivity[];
-  settings: GrownUpSettings;
+  settings: Pick<GrownUpSettings, "advancedInput" | "physicalLetters">;
   voiceAvailable: boolean;
   onBack: () => void;
 }

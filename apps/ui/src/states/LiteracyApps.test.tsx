@@ -20,8 +20,8 @@ it.each(["air_writing", "sound_hunt", "co_reading", "letter_labels", "body_lette
 });
 it("opens Memory Match locally without requesting a generated question", () => {
   const getQuestion = vi.spyOn(coreClient, "getQuestion");
-  render(<Hub activities={[{ activityId: "memory_cards", title: "Memory Match", description: "Practice", icon: "A", availability: "AVAILABLE" }]} onPlayingChange={vi.fn()} homeRequest={0} />);
-  fireEvent.click(screen.getByRole("button", { name: "Memory Match, available" }));
+  render(<Hub activities={[{ activityId: "memory_cards", title: "Find the Pairs", description: "Practice", icon: "🃏", availability: "AVAILABLE" }]} onPlayingChange={vi.fn()} homeRequest={0} />);
+  fireEvent.click(screen.getByRole("button", { name: "Find the Pairs, available" }));
   expect(screen.getAllByRole("button", { name: /Hidden card/ })).toHaveLength(16);
   expect(getQuestion).not.toHaveBeenCalled();
 });

@@ -64,7 +64,7 @@ it("builds a word by tapping letters in order", () => {
 
 it("opens the grown-up gate only after a two-second pointer or keyboard hold", () => {
   vi.useFakeTimers();
-  render(<GrownUpGate settings={{ advancedInput: false, physicalLetters: false }} onChange={vi.fn()} />);
+  render(<GrownUpGate settings={{ advancedInput: false, physicalLetters: false, hiddenGames: [], hiddenSections: [] }} onChange={vi.fn()} />);
   const gear = screen.getByRole("button", { name: /Hold for two seconds/ });
   fireEvent.click(gear);
   expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
@@ -82,9 +82,24 @@ it("opens the grown-up gate only after a two-second pointer or keyboard hold", (
 });
 
 it("keeps the stable grown-up storage keys and uses safe defaults", () => {
-  expect(readGrownUpSettings()).toEqual({ advancedInput: false, physicalLetters: false });
+  expect(readGrownUpSettings()).toEqual({ advancedInput: false, physicalLetters: false, hiddenGames: [], hiddenSections: [] });
   window.localStorage.setItem("jaitra-advanced-input", "true");
-  expect(readGrownUpSettings()).toEqual({ advancedInput: true, physicalLetters: false });
+  expect(readGrownUpSettings()).toEqual({ advancedInput: true, physicalLetters: false, hiddenGames: [], hiddenSections: [] });
+});
+
+it("saves a valid riddle mix inside the grown-up dialog", () => {
+  vi.useFakeTimers();
+  render(<GrownUpGate settings={{ advancedInput: false, physicalLetters: false, hiddenGames: [], hiddenSections: [] }} onChange={vi.fn()} />);
+  fireEvent.pointerDown(screen.getByRole("button", { name: /Hold for two seconds/ }), { button: 0 });
+  act(() => vi.advanceTimersByTime(2000));
+  expect(screen.getByRole("dialog")).toHaveFocus();
+  const inputs = ["Everyday objects", "Food & nature riddles", "Colours", "Geography", "Numbers & patterns"].map(label => screen.getByRole("spinbutton", { name: `${label} percent` }));
+  for (const [index, input] of inputs.entries()) fireEvent.change(input, { target: { value: index === 4 ? "100" : "0" } });
+  fireEvent.click(screen.getByRole("button", { name: "Save topic mix" }));
+  expect(JSON.parse(window.localStorage.getItem("jaitra-riddle-topic-mix")!)).toEqual({ objects: 0, riddles: 0, colours: 0, geography: 0, patterns: 100 });
+  fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: /Hold for two seconds/ })).toHaveFocus();
 });
 
 it("keeps a valid answer among four choices for every tap quiz mode", async () => {

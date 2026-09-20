@@ -174,7 +174,7 @@ export function StorybookApp({ onBack, voiceAvailable, onReadingChange }: { onBa
     <section className="panel storybook-panel" aria-labelledby="storybook-title">
       <div className="storybook-toolbar">
         <button className="back-button game-back" type="button" onClick={exit}>← Exit to home</button>
-        <span className="storybook-name" id="storybook-title">📖 Mimo’s Storybook</span>
+        <span className="storybook-name" id="storybook-title">📖 Storybook</span>
         {story && <span className="storybook-providers" aria-label={`Story text: ${story.textProvider ?? "checking"}; art: ${story.imageProvider}`}>
           Text · {(story.textProvider ?? "checking").toUpperCase()} | Art · OPENROUTER
         </span>}

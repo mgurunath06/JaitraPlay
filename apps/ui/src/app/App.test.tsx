@@ -14,16 +14,16 @@ const idleSnapshot = {
     activities: [
       {
         activityId: "picture_guess",
-        title: "Picture Guess",
+        title: "Look & Guess",
         description: "Spot the animal that Mimo asks for.",
         icon: "🐘",
         availability: "AVAILABLE" as const,
       },
       {
         activityId: "memory_cards",
-        title: "Memory Match",
+        title: "Find the Pairs",
         description: "Turn over cards and find every pair.",
-        icon: "🧠",
+        icon: "🃏",
         availability: "AVAILABLE" as const,
       },
     ],
@@ -125,10 +125,10 @@ describe("child shell", () => {
     await act(async () => Promise.resolve());
 
     expect(screen.getByRole("heading", { name: "Choose an app" })).toBeVisible();
-    expect(screen.getByRole("button", { name: "Picture Guess, available" })).toBeEnabled();
-    expect(screen.getByRole("button", { name: "Memory Match, available" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Look & Guess, available" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Find the Pairs, available" })).toBeEnabled();
 
-    fireEvent.click(screen.getByRole("button", { name: "Picture Guess, available" }));
+    fireEvent.click(screen.getByRole("button", { name: "Look & Guess, available" }));
     await act(async () => { await vi.advanceTimersByTimeAsync(0); });
     expect(screen.getByRole("heading", { name: "Can you find the elephant?" })).toBeVisible();
     expect(screen.getByLabelText("Question API: MWAPI")).toHaveTextContent("API · MWAPI");
@@ -168,7 +168,7 @@ describe("child shell", () => {
     });
     render(<App />);
     await act(async () => Promise.resolve());
-    fireEvent.click(screen.getByRole("button", { name: "Picture Guess, available" }));
+    fireEvent.click(screen.getByRole("button", { name: "Look & Guess, available" }));
     await act(async () => { await vi.advanceTimersByTimeAsync(0); });
     expect(screen.getByRole("button", { name: "Skip this hunt" })).toBeVisible();
     fireEvent.click(screen.getByRole("button", { name: "I found one!" }));
@@ -182,7 +182,7 @@ describe("child shell", () => {
     });
     render(<StrictMode><App /></StrictMode>);
     await act(async () => Promise.resolve());
-    fireEvent.click(screen.getByRole("button", { name: "Picture Guess, available" }));
+    fireEvent.click(screen.getByRole("button", { name: "Look & Guess, available" }));
     await act(async () => { await vi.advanceTimersByTimeAsync(0); });
     expect(window.jaitra!.getQuestion).toHaveBeenCalledOnce();
     fireEvent.keyDown(window, { key: "Escape" });

@@ -41,31 +41,31 @@ logger = logging.getLogger(__name__)
 APP_CATALOG = (
     {
         "activity_id": "picture_guess",
-        "title": "Picture Guess",
+        "title": "Look & Guess",
         "description": "Explore pictures, counting and odd-one-out puzzles.",
         "icon": "🐘",
     },
     {
         "activity_id": "memory_cards",
-        "title": "Memory Match",
+        "title": "Find the Pairs",
         "description": "Turn over cards and find every pair.",
-        "icon": "🧠",
+        "icon": "🃏",
     },
     {
         "activity_id": "riddle_guess",
-        "title": "Riddle & Discovery Garden",
+        "title": "Guess It!",
         "description": "Solve riddles and explore colours, maps and patterns.",
-        "icon": "🌱",
+        "icon": "❓",
     },
     {
         "activity_id": "storybook",
-        "title": "Mimo’s Storybook",
+        "title": "Storybook",
         "description": "Create and explore a new illustrated story.",
         "icon": "📖",
     },
     {
         "activity_id": "tell_time",
-        "title": "Time with Mimo",
+        "title": "What's the Time?",
         "description": "Read a big clock, from whole hours to five-minute steps.",
         "icon": "🕒",
     },

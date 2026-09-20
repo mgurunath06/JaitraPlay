@@ -42,7 +42,7 @@ export function ClockApp({ onBack, voiceAvailable = false }: { onBack: () => voi
     }
   };
   return <section className="panel game-panel clock-game" aria-labelledby="clock-title">
-    <div className="game-toolbar"><button className="back-button" onClick={onBack}>← Exit to home</button><h1 id="clock-title">Time with Mimo</h1><span aria-label={`${stars} stars`}>⭐ {stars}</span></div>
+    <div className="game-toolbar"><button className="back-button" onClick={onBack}>← Exit to home</button><h1 id="clock-title">What's the Time?</h1><span aria-label={`${stars} stars`}>⭐ {stars}</span></div>
     <label>Clock level <select value={level} onChange={e => { const value = e.target.value as ClockLevel; setLevel(value); next(value); }}>
       <option value="hours">Whole hours</option><option value="halves">Half hours</option><option value="quarters">Quarter hours</option><option value="five_minutes">Five-minute steps</option>
     </select></label>

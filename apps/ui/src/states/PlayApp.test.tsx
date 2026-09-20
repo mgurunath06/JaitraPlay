@@ -5,29 +5,18 @@ import { PlayApp } from "./PlayApp";
 
 afterEach(() => { vi.restoreAllMocks(); window.localStorage.clear(); });
 
-it("sets the riddle mix before play and allows changes during a game", async () => {
+it("starts a riddle immediately with the saved topic mix", async () => {
+  window.localStorage.setItem("jaitra-riddle-topic-mix", JSON.stringify({ objects: 0, riddles: 0, colours: 0, geography: 0, patterns: 100 }));
   const getQuestion = vi.spyOn(coreClient, "getQuestion").mockResolvedValue({
-    activityId: "riddle_guess", prompt: "What am I?", hint: "A hint", answer: "book",
-    choices: [{ value: "book", label: "Book", color: null }],
-    explanation: "A book.", provider: "local", kind: "quiz", topic: "riddles",
+    activityId: "riddle_guess", prompt: "What comes next?", hint: "A hint", answer: "4",
+    choices: [{ value: "4", label: "4", color: null }],
+    explanation: "The number is four.", provider: "local", kind: "quiz", topic: "patterns",
   });
-  render(<PlayApp activity={{ activityId: "riddle_guess", title: "Riddles", description: "", icon: "🌱" }} onBack={() => {}} />);
-  expect(screen.getByText("Choose your topics")).toBeVisible();
-  expect(getQuestion).not.toHaveBeenCalled();
-  const inputs = screen.getAllByRole("spinbutton") as HTMLInputElement[];
-  fireEvent.change(inputs[0], { target: { value: "100" } });
-  fireEvent.change(inputs[1], { target: { value: "0" } });
-  fireEvent.change(inputs[2], { target: { value: "0" } });
-  fireEvent.change(inputs[3], { target: { value: "0" } });
-  fireEvent.change(inputs[4], { target: { value: "0" } });
-  fireEvent.click(screen.getByRole("button", { name: "Start playing" }));
-  await waitFor(() => expect(getQuestion).toHaveBeenCalledWith("riddle_guess", expect.objectContaining({ topic: "objects" })));
-  fireEvent.click(screen.getByRole("button", { name: /Topics/ }));
-  const revised = screen.getAllByRole("spinbutton") as HTMLInputElement[];
-  fireEvent.change(revised[0], { target: { value: "0" } });
-  fireEvent.change(revised[3], { target: { value: "100" } });
-  fireEvent.click(screen.getByRole("button", { name: "Save mix" }));
+  render(<PlayApp activity={{ activityId: "riddle_guess", title: "Guess It!", description: "", icon: "❓" }} onBack={() => {}} />);
+  await waitFor(() => expect(getQuestion).toHaveBeenCalledWith("riddle_guess", expect.objectContaining({ topic: "patterns" })));
+  expect(screen.getByText("What comes next?")).toBeVisible();
+  expect(screen.queryByText("Choose your topics")).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: /Option 1/ }));
   fireEvent.click(screen.getByRole("button", { name: /Next question/ }));
-  await waitFor(() => expect(getQuestion).toHaveBeenLastCalledWith("riddle_guess", expect.objectContaining({ topic: "geography" })));
+  await waitFor(() => expect(getQuestion).toHaveBeenCalledTimes(2));
 });

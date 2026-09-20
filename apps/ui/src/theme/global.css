@@ -41,7 +41,14 @@ h1 { font-size: clamp(42px, 6vw, 88px); line-height: 1.02; margin: 0 0 42px; let
 .grown-up-gear { position: absolute; top: 18px; right: 24px; width: 48px; height: 48px; border: 2px solid #d8d4e9; border-radius: 50%; background: white; font-size: 23px; cursor: pointer; touch-action: none; }
 .grown-up-gear:focus-visible { outline: 4px solid #6e5bd4; outline-offset: 3px; }
 .grown-up-overlay { position: fixed; inset: 0; z-index: 40; display: grid; place-items: center; padding: 20px; background: #071426e8; }
-.grown-up-panel { width: min(540px, 100%); padding: 28px; border-radius: 28px; background: white; box-shadow: 0 24px 70px #07142666; }
+.grown-up-panel { width: min(620px, 100%); max-height: min(90vh, 900px); display: flex; flex-direction: column; padding: 28px; border-radius: 28px; background: white; box-shadow: 0 24px 70px #07142666; }
+.grown-up-panel:focus { outline: none; }
+.grown-up-settings-scroll { overflow-y: auto; min-height: 0; }
+.grown-up-setting-group { padding: 14px 0 24px; border-top: 2px solid #e5eaf0; }
+.grown-up-setting-group h3 { margin: 0 0 8px; font-size: 24px; }
+.grown-up-setting-group > p { line-height: 1.4; }
+.grown-up-shelf-group { padding: 3px 0 10px; border-bottom: 1px solid #e5eaf0; }
+.grown-up-panel label.grown-up-game-toggle { margin: 5px 0 5px 28px; font-size: 17px; font-weight: 700; }
 .grown-up-panel h2 { margin: 0 0 10px; font-size: 32px; }
 .grown-up-panel label { display: flex; align-items: center; gap: 12px; margin: 20px 0 8px; font-size: 19px; font-weight: 800; }
 .grown-up-panel input { width: 24px; height: 24px; accent-color: #6e5bd4; }
@@ -74,6 +81,15 @@ h1 { font-size: clamp(42px, 6vw, 88px); line-height: 1.02; margin: 0 0 42px; let
 .topic-menu > p { color: #556b7d; font-weight: 700; line-height: 1.4; }
 .topic-row { display: grid; grid-template-columns: 1fr 95px 20px; align-items: center; gap: 10px; margin: 10px 0; padding: 12px 16px; border-radius: 16px; background: white; text-align: left; font-size: 20px; font-weight: 900; }
 .topic-row input { width: 100%; padding: 8px; border: 2px solid #b5a8ed; border-radius: 10px; color: #17324d; font: inherit; text-align: right; }
+.grown-up-panel .topic-row { display: grid; grid-template-columns: minmax(0, 1fr) 85px 20px; margin: 8px 0; font-size: 17px; }
+.grown-up-panel .topic-row input { height: auto; accent-color: auto; }
+.shelf-section { margin: 0 0 34px; }
+.shelf-section h2 { margin: 0 0 14px; font-size: clamp(23px, 2.4vw, 32px); }
+.shelf-grid { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
+.shelf-grid .activity-card { min-height: 180px; }
+.shelf-empty { padding: 22px; border-radius: 18px; background: #fff3cb; font-weight: 800; }
+@media (max-width: 1100px) { .shelf-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; } }
+@media (max-width: 760px) { .shelf-grid { grid-template-columns: 1fr !important; } }
 .topic-total { margin: 14px 0 20px; }
 .topic-actions { display: flex; justify-content: center; flex-wrap: wrap; gap: 12px; }
 .topic-actions button:disabled { opacity: .45; cursor: default; }
