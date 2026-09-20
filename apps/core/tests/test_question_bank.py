@@ -4,6 +4,11 @@ from pathlib import Path
 from unittest.mock import patch
 
 from jaitra_core.providers import AiQuestionService, ProviderAvailabilityService, QuestionBank
+from jaitra_core.providers.question_bank import (
+    MAXIMUM_QUESTIONS,
+    QUESTION_ACTIVITIES,
+    minimum_for,
+)
 
 
 def test_bank_persists_a_reserve_for_every_activity(tmp_path: Path) -> None:
@@ -35,7 +40,7 @@ def test_bank_persists_a_reserve_for_every_activity(tmp_path: Path) -> None:
             question = bank.take("picture_guess", history)
             history.insert(0, question)
         stats = bank.stats()
-        assert stats["total"] <= 1500
+        assert stats["total"] <= MAXIMUM_QUESTIONS
         assert stats["undisplayedByActivity"]["picture_guess"] >= 200  # type: ignore[index]
     finally:
         bank.stop()
@@ -43,10 +48,26 @@ def test_bank_persists_a_reserve_for_every_activity(tmp_path: Path) -> None:
     restarted = QuestionBank(tmp_path / "question-bank")
     restarted.start()
     try:
-        assert restarted.stats()["total"] <= 1500
+        assert restarted.stats()["total"] <= MAXIMUM_QUESTIONS
         assert restarted.stats()["displayed"] >= 25
     finally:
         restarted.stop()
+
+
+def test_bank_keeps_reserves_under_mixed_load(tmp_path: Path) -> None:
+    bank = QuestionBank(tmp_path / "question-bank")
+    bank.start()
+    history = []
+    activities = ("picture_guess", "riddle_guess", "rhyme_time", "counting_numbers", "memory_cards")
+    try:
+        for index in range(400):
+            question = bank.take(activities[index % len(activities)], history)
+            history.insert(0, question)
+            assert bank.stats()["total"] <= MAXIMUM_QUESTIONS
+        counts = bank.stats()["undisplayedByActivity"]
+        assert all(counts[activity] >= minimum_for(activity) for activity in QUESTION_ACTIVITIES)  # type: ignore[index]
+    finally:
+        bank.stop()
 
 
 def test_provider_monitor_stops_at_first_success_and_invalidates_it_on_failure(

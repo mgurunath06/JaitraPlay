@@ -316,11 +316,12 @@ def normalized(prompt: str) -> str:
 def repeats_question(
     question: GeneratedQuestion, history: list[GeneratedQuestion], prompts: list[str]
 ) -> bool:
-    target = normalized(question.prompt)
-    if any(SequenceMatcher(None, target, normalized(old)).ratio() > 0.82 for old in prompts):
+    # This equivalent early check avoids comparing hundreds of prompt pairs when
+    # a target answer has already appeared in the growing appliance history.
+    if any(old.answer == question.answer and old.kind == question.kind for old in history):
         return True
-    # Reject rephrased quizzes aimed at the same answer across recently played games.
-    return any(old.answer == question.answer and old.kind == question.kind for old in history)
+    target = normalized(question.prompt)
+    return any(SequenceMatcher(None, target, normalized(old)).ratio() > 0.82 for old in prompts)
 
 
 def shuffle_question_choices(
@@ -344,6 +345,17 @@ def local_question_candidates(activity_id: str) -> list[GeneratedQuestion]:
         explanation: str,
         kind: str = "quiz",
     ) -> None:
+        if activity_id in {
+            "rhyme_time",
+            "good_manners",
+            "counting_numbers",
+            "shapes_sorting",
+            "animal_sounds",
+            "daily_routine",
+        }:
+            # The bank stores varied answer positions; delivery shuffles again.
+            offset = len(candidates) % len(items)
+            items = items[offset:] + items[:offset]
         candidates.append(
             GeneratedQuestion.model_validate(
                 {

@@ -358,7 +358,7 @@ The persistent fallback bank is `.local/state/question-bank/questions.json`. On 
 contains 205 unseen questions for each of the four original question games and 90 for each
 of the six local-only games. Its background builder refills the original games when their
 unseen count reaches 200 and the new games when it reaches 70. Displayed and unseen records
-share a hard cap of 1,500; the oldest displayed records are rotated out first. Current
+share a hard cap of 2,000; the oldest displayed records are rotated out first. Current
 provider and bank counts are also available from `GET /api/v1/health` as `questionProvider`
 and `questionBank`.
 

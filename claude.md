@@ -26,16 +26,21 @@ include all six. The generated pools have 160, 240, 184, 168, 150, and 180
 distinct prompts respectively. Tests check choice validity and factual answers,
 including counting, comparisons, rhymes, animal sounds, and the odd shape.
 
-The question bank cap is 1,500, as the owner authorized. `BANK_VERSION` remains
+The question bank cap is 2,000 after the Phase B hardening pass. `BANK_VERSION` remains
 5 because the schema did not change. It targets 205 unseen questions per original
 game and 90 per new game, with refill thresholds of 200 and 70. Initial reserve
 is 1,360. When strict similarity filtering rejects all candidates, selection
 prefers a prompt absent from recent history. README reflects the new limits.
 
-Verification on this development checkout: targeted core tests passed (32),
-the full core suite passed (89), the full UI suite passed (127), Ruff and mypy
-passed, and UI lint and production build passed. Phase B is ready for the
-owner's review. Stop after Phase B for that review.
+The hardening pass adds a 400-round mixed bank load test and build-time checks
+for choice values, labels, answer positions, and the factual mappings of all
+six new games. The stored candidate order now varies answer positions; delivery
+continues to shuffle choices. It adds no UI change or live content validator.
+
+Verification on this development checkout: the hardening pass passed all 91
+core tests, Ruff, and mypy. Phase B's earlier UI suite passed 127 tests, with
+UI lint and production build passing; the hardening pass changes no UI files.
+Stop after this pass for the owner's review.
 
 The user also asked whether local language models could help and whether the
 Ubuntu desktop supports them. The reported desktop has an RTX 3050 6 GB,

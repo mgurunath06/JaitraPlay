@@ -7,9 +7,11 @@ import anyio
 from jaitra_core.api.models import GeneratedQuestion, QuestionRequest
 from jaitra_core.config import AppConfig
 from jaitra_core.providers import QuestionGenerationError
+from jaitra_core.providers.question_bank import MAXIMUM_QUESTIONS
 from jaitra_core.providers.variety import (
     ANIMAL_SOUNDS,
     RHYME_FAMILIES,
+    SCHOOL_SHAPES,
     local_question,
     local_question_candidates,
     repeats_question,
@@ -92,6 +94,23 @@ def test_new_local_games_have_large_valid_quiz_pools() -> None:
             question.answer in {choice.value for choice in question.choices}
             for question in questions
         )
+        answer_positions = set()
+        for question in questions:
+            assert (
+                GeneratedQuestion.model_validate(question.model_dump(mode="json", by_alias=True))
+                == question
+            )
+            assert len(question.prompt) <= 200
+            assert all(len(choice.label) <= 40 for choice in question.choices)
+            assert all(re.fullmatch(r"[a-z0-9_-]+", choice.value) for choice in question.choices)
+            answer_positions.add(
+                next(
+                    index
+                    for index, choice in enumerate(question.choices)
+                    if choice.value == question.answer
+                )
+            )
+        assert len(answer_positions) >= 2, activity
 
 
 def test_counting_answers_match_pictures_and_comparisons() -> None:
@@ -108,6 +127,9 @@ def test_counting_answers_match_pictures_and_comparisons() -> None:
             assert question.answer == str(
                 max(first, second) if match[1] == "more" else min(first, second)
             )
+        else:
+            numbers = re.findall(r"\b\d+\b", question.prompt)
+            assert numbers == [question.answer]
 
 
 def test_rhymes_and_animal_sounds_have_one_factually_correct_choice() -> None:
@@ -128,20 +150,99 @@ def test_rhymes_and_animal_sounds_have_one_factually_correct_choice() -> None:
     animal_by_sound = {sound: animal for animal, sound in sound_by_animal.items()}
     for question in local_question_candidates("animal_sounds"):
         if question.answer in sound_by_animal:
-            assert sound_by_animal[question.answer] in question.prompt
+            named_sounds = [
+                sound for sound in animal_by_sound if re.search(rf"\b{sound}\b", question.prompt)
+            ]
+            assert named_sounds == [sound_by_animal[question.answer]]
+            assert [
+                choice.value
+                for choice in question.choices
+                if sound_by_animal[choice.value] in named_sounds
+            ] == [question.answer]
         else:
-            assert animal_by_sound[question.answer] in question.prompt
+            named_animals = [
+                animal for animal in sound_by_animal if re.search(rf"\b{animal}\b", question.prompt)
+            ]
+            assert named_animals == [animal_by_sound[question.answer]]
+            assert [
+                choice.value
+                for choice in question.choices
+                if animal_by_sound[choice.value] in named_animals
+            ] == [question.answer]
 
 
 def test_odd_shape_questions_have_one_different_picture() -> None:
+    shape_by_icon = {icon: shape for shape, icon in SCHOOL_SHAPES}
+    opposites = (
+        ("big", "small"),
+        ("hot", "cold"),
+        ("up", "down"),
+        ("in", "out"),
+        ("open", "closed"),
+        ("day", "night"),
+        ("happy", "sad"),
+        ("full", "empty"),
+        ("wet", "dry"),
+        ("fast", "slow"),
+        ("clean", "dirty"),
+        ("loud", "quiet"),
+    )
+    opposite_of = {
+        word: other
+        for first, second in opposites
+        for word, other in ((first, second), (second, first))
+    }
     for question in local_question_candidates("shapes_sorting"):
-        if not question.prompt.startswith("Which shape is different?"):
-            continue
-        pictures = question.prompt.split("? ", 1)[1].split()
-        assert len(pictures) == 4
-        assert sorted(pictures.count(picture) for picture in set(pictures)) == [1, 3]
-        odd_picture = next(picture for picture in pictures if pictures.count(picture) == 1)
-        assert question.answer == str(pictures.index(odd_picture) + 1)
+        if question.prompt.startswith("Which shape is different?"):
+            pictures = question.prompt.split("? ", 1)[1].split()
+            assert len(pictures) == 4
+            assert set(pictures) <= shape_by_icon.keys()
+            assert sorted(pictures.count(picture) for picture in set(pictures)) == [1, 3]
+            odd_picture = next(picture for picture in pictures if pictures.count(picture) == 1)
+            assert question.answer == str(pictures.index(odd_picture) + 1)
+            assert {choice.label for choice in question.choices} == {
+                f"{index + 1}: {picture}" for index, picture in enumerate(pictures)
+            }
+        elif "opposite" in question.prompt:
+            sources = [word for word in opposite_of if re.search(rf"\b{word}\b", question.prompt)]
+            assert len(sources) == 1
+            assert question.answer == opposite_of[sources[0]]
+        else:
+            shapes = [
+                shape for shape, _ in SCHOOL_SHAPES if re.search(rf"\b{shape}\b", question.prompt)
+            ]
+            assert shapes == [question.answer]
+            assert next(
+                choice.label for choice in question.choices if choice.value == question.answer
+            ).startswith(next(icon for shape, icon in SCHOOL_SHAPES if shape == question.answer))
+
+
+def test_good_manners_answers_match_each_situation_and_face() -> None:
+    intended = {
+        "gets a gift from a friend": "thank_you",
+        "is handed a shared toy": "thank_you",
+        "gets help carrying books": "thank_you",
+        "wants a turn with a toy": "please",
+        "asks for a glass of water": "please",
+        "wants to borrow a crayon": "please",
+        "accidentally bumps a friend": "sorry",
+        "spills water on a friend's drawing": "sorry",
+        "steps on someone's shoe": "sorry",
+        "needs to pass through a busy doorway": "excuse_me",
+        "wants a teacher's attention": "excuse_me",
+        "needs to move past someone in a line": "excuse_me",
+    }
+    faces = {"😊": "happy", "😢": "sad", "😠": "angry", "😨": "scared"}
+    questions = local_question_candidates("good_manners")
+    assert len(questions) == len(intended) * 15 + len(faces) * 15
+    for question in questions:
+        if "has this face" in question.prompt:
+            matches = [feeling for icon, feeling in faces.items() if icon in question.prompt]
+        else:
+            matches = [
+                answer for situation, answer in intended.items() if situation in question.prompt
+            ]
+        assert matches == [question.answer]
 
 
 def test_daily_routine_next_steps_are_correct() -> None:
@@ -250,7 +351,7 @@ def test_offline_games_and_history_retention(config: AppConfig, repository_root:
             assert len(records) == 120
             assert len({json.loads(raw)["prompt"] for raw in records}) == 120
             bank = runtime.question_bank.stats()
-            assert bank["total"] <= 1500
+            assert bank["total"] <= MAXIMUM_QUESTIONS
             assert all(
                 count >= bank["minimumUndisplayedByActivity"][activity]  # type: ignore[index]
                 for activity, count in bank["undisplayedByActivity"].items()  # type: ignore[union-attr]
