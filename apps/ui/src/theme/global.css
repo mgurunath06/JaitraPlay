@@ -37,6 +37,25 @@ h1 { font-size: clamp(42px, 6vw, 88px); line-height: 1.02; margin: 0 0 42px; let
 .availability.soon { color: #68798a; background: rgba(255,255,255,.72); }
 .activity-title { margin-bottom: 7px; font-size: clamp(22px, 2vw, 30px); font-weight: 900; }
 .activity-description { color: #556b7d; font-size: 16px; font-weight: 700; line-height: 1.35; }
+.hub { position: relative; }
+.grown-up-gear { position: absolute; top: 18px; right: 24px; width: 48px; height: 48px; border: 2px solid #d8d4e9; border-radius: 50%; background: white; font-size: 23px; cursor: pointer; touch-action: none; }
+.grown-up-gear:focus-visible { outline: 4px solid #6e5bd4; outline-offset: 3px; }
+.grown-up-overlay { position: fixed; inset: 0; z-index: 40; display: grid; place-items: center; padding: 20px; background: #071426e8; }
+.grown-up-panel { width: min(540px, 100%); padding: 28px; border-radius: 28px; background: white; box-shadow: 0 24px 70px #07142666; }
+.grown-up-panel h2 { margin: 0 0 10px; font-size: 32px; }
+.grown-up-panel label { display: flex; align-items: center; gap: 12px; margin: 20px 0 8px; font-size: 19px; font-weight: 800; }
+.grown-up-panel input { width: 24px; height: 24px; accent-color: #6e5bd4; }
+.grown-up-note { margin: 0; color: #556b7d; }
+.letters-world .hub-heading { align-items: center; }
+.letters-world .hub-heading h1 { margin-bottom: 12px; }
+.letters-intro { color: #556b7d; font-size: 20px; font-weight: 800; }
+.letters-ladder { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.letter-mode-card { min-height: 190px; }
+.letter-step, .letter-mode-badge { display: inline-block; width: fit-content; padding: 5px 10px; border-radius: 999px; background: #e8e3ff; color: #5745b0; font-size: 13px; font-weight: 900; }
+.letter-mode-badge { margin-top: auto; background: #ffe8b5; color: #704800; }
+.letters-extras { margin-top: 30px; }
+.letters-extras h2 { font-size: 25px; }
+@media (max-width: 760px) { .letters-ladder { grid-template-columns: 1fr; } .grown-up-gear { top: 12px; right: 14px; } }
 .app-preview { position: relative; text-align: center; }
 .app-preview h1 { margin-bottom: 18px; }
 .back-button { position: absolute; top: 28px; left: 32px; padding: 10px 16px; border: 0; border-radius: 999px; color: #5745b0; background: #edf0ff; font-weight: 900; cursor: pointer; }

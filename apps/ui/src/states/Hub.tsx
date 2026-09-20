@@ -3,8 +3,10 @@ import { useEffect, useState } from "react";
 import { PlayApp, type PlayableActivity } from "./PlayApp";
 import { ClockApp } from "./ClockApp";
 import { StorybookApp } from "./StorybookApp";
-import { AirWritingApp, BodyLettersApp, CoReadingApp, LetterLabelsApp, SoundHuntApp, TwoLetterWordsApp, WordCardsApp } from "./LiteracyApps";
 import { MemoryApp } from "./MemoryApp";
+import { LettersWorld } from "./LettersWorld";
+import { GrownUpGate } from "./GrownUpGate";
+import { readGrownUpSettings } from "./grownUpSettings";
 
 interface Activity extends PlayableActivity {
   activityId: string;
@@ -14,25 +16,25 @@ interface Activity extends PlayableActivity {
   availability: "AVAILABLE" | "COMING_SOON";
 }
 
+const LETTER_IDS = new Set(["air_writing", "body_letters", "sound_hunt", "co_reading", "two_letter_words", "letter_labels", "word_cards"]);
+const ABC_ACTIVITY: Activity = { activityId: "abc_play", title: "ABC Play", description: "Find letters, hear sounds and build words.", icon: "🔤", availability: "AVAILABLE" };
+
 export function Hub({ activities, voiceAvailable = false, onPlayingChange, onStoryReadingChange, homeRequest }: { activities: Activity[]; voiceAvailable?: boolean; onPlayingChange: (playing: boolean) => void; onStoryReadingChange?: (reading: boolean) => void; homeRequest: number }) {
   const [selected, setSelected] = useState<Activity | null>(null);
+  const [grownUpSettings, setGrownUpSettings] = useState(readGrownUpSettings);
+  const letterActivities = activities.filter(activity => LETTER_IDS.has(activity.activityId));
+  const shelfActivities = activities.filter(activity => !LETTER_IDS.has(activity.activityId));
+  if (letterActivities.length && !shelfActivities.some(activity => activity.activityId === "abc_play")) shelfActivities.push(ABC_ACTIVITY);
 
   useEffect(() => { onPlayingChange(Boolean(selected)); return () => onPlayingChange(false); }, [selected, onPlayingChange]);
   useEffect(() => { setSelected(null); quietMimo(); clearMimoAnswer(); }, [homeRequest]);
   if (selected) {
+    if (selected.activityId === "abc_play") return <LettersWorld activities={letterActivities} settings={grownUpSettings} voiceAvailable={voiceAvailable} onBack={() => { quietMimo(); setSelected(null); }} />;
     if (selected.activityId === "tell_time") return <ClockApp voiceAvailable={voiceAvailable} onBack={() => { quietMimo(); setSelected(null); }} />;
     if (selected.activityId === "storybook") {
       return <StorybookApp voiceAvailable={voiceAvailable} onReadingChange={onStoryReadingChange} onBack={() => { quietMimo(); setSelected(null); }} />;
     }
-    const back = () => { quietMimo(); clearMimoAnswer(); setSelected(null); };
-    if (selected.activityId === "air_writing") return <AirWritingApp onBack={back} />;
-    if (selected.activityId === "sound_hunt") return <SoundHuntApp voiceAvailable={voiceAvailable} onBack={back} />;
-    if (selected.activityId === "co_reading") return <CoReadingApp voiceAvailable={voiceAvailable} onBack={back} />;
-    if (selected.activityId === "letter_labels") return <LetterLabelsApp onBack={back} />;
-    if (selected.activityId === "body_letters") return <BodyLettersApp onBack={back} />;
-    if (selected.activityId === "two_letter_words") return <TwoLetterWordsApp voiceAvailable={voiceAvailable} onBack={back} />;
-    if (selected.activityId === "word_cards") return <WordCardsApp onBack={back} />;
-    if (selected.activityId === "memory_cards") return <MemoryApp onBack={back} />;
+    if (selected.activityId === "memory_cards") return <MemoryApp onBack={() => { quietMimo(); setSelected(null); }} />;
     return <PlayApp voiceAvailable={voiceAvailable} activity={selected} onBack={() => { quietMimo(); clearMimoAnswer(); setSelected(null); }} />;
   }
 
@@ -43,12 +45,13 @@ export function Hub({ activities, voiceAvailable = false, onPlayingChange, onSto
           <p className="eyebrow">Mimo’s playroom</p>
           <h1 id="games-title">Choose an app</h1>
         </div>
-        <span className="app-count" aria-label={`${activities.length} apps`}>
-          {activities.length} apps
+        <span className="app-count" aria-label={`${shelfActivities.length} apps`}>
+          {shelfActivities.length} apps
         </span>
       </div>
+      <GrownUpGate settings={grownUpSettings} onChange={setGrownUpSettings} />
       <div className="activity-grid">
-        {activities.map((activity, index) => {
+        {shelfActivities.map((activity, index) => {
           const available = activity.availability === "AVAILABLE";
           return (
             <button

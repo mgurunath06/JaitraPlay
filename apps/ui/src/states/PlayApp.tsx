@@ -1,6 +1,6 @@
-import { clearMimoAnswer, reactMimo, showMimoAnswer } from "../components/mimo";
+import { clearMimoAnswer, reactMimo, showMimoAnswer, speakMimo } from "../components/mimo";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import type { GeneratedQuestion, RiddleTopic } from "../../../../packages/contracts/src";
+import type { GeneratedQuestion, QuestionRequest, RiddleTopic } from "../../../../packages/contracts/src";
 import { VoiceAnswer } from "../voice/VoiceAnswer";
 import { coreClient } from "../app/coreClient";
 
@@ -51,7 +51,7 @@ function chooseTopic(mix: TopicMix, counts: TopicMix): RiddleTopic {
   ).id;
 }
 
-export function PlayApp({ activity, onBack, voiceAvailable = false }: { activity: PlayableActivity; onBack: () => void; voiceAvailable?: boolean }) {
+export function PlayApp({ activity, onBack, voiceAvailable = false, questionLoader = coreClient.getQuestion, questionSpeech }: { activity: PlayableActivity; onBack: () => void; voiceAvailable?: boolean; questionLoader?: (activityId: string, request: QuestionRequest) => Promise<GeneratedQuestion>; questionSpeech?: (question: GeneratedQuestion) => string }) {
   const isRiddle = activity.activityId === "riddle_guess";
   const [mix, setMix] = useState<TopicMix>(storedMix);
   const [draftMix, setDraftMix] = useState<TopicMix>(mix);
@@ -74,7 +74,7 @@ export function PlayApp({ activity, onBack, voiceAvailable = false }: { activity
     setLoading(true);
     setError(false);
     try {
-      const next = await coreClient.getQuestion(activity.activityId, {
+      const next = await questionLoader(activity.activityId, {
         previousPrompt,
         neededHint,
         recentPrompts: recentPrompts.current,
@@ -82,6 +82,7 @@ export function PlayApp({ activity, onBack, voiceAvailable = false }: { activity
       });
       if (sequence !== requestSequence.current) return;
       setQuestion(next);
+      if (questionSpeech) speakMimo(questionSpeech(next));
       if (topic) topicCounts.current[topic] += 1;
       recentPrompts.current = [...recentPrompts.current, next.prompt].slice(-10);
       setHintUsed(false);
@@ -90,7 +91,7 @@ export function PlayApp({ activity, onBack, voiceAvailable = false }: { activity
     } finally {
       if (sequence === requestSequence.current) setLoading(false);
     }
-  }, [activity.activityId, isRiddle]);
+  }, [activity.activityId, isRiddle, questionLoader, questionSpeech]);
 
   useEffect(() => {
     // Defer one tick so StrictMode's discarded effect does not generate a paid round.
@@ -155,7 +156,7 @@ export function PlayApp({ activity, onBack, voiceAvailable = false }: { activity
         question.kind === "room_hunt" ? (
           <RoomHunt question={question} onNext={next} />
         ) : (
-          <QuizRound voiceAvailable={voiceAvailable} activityId={activity.activityId} question={question} hintUsed={hintUsed} onHint={() => { reactMimo("hint"); setHintUsed(true); }} onCorrect={() => setStars((value) => value + 1)} onNext={next} />
+          <QuizRound voiceAvailable={voiceAvailable} activityId={activity.activityId} question={question} questionSpeech={questionSpeech} hintUsed={hintUsed} onHint={() => { reactMimo("hint"); setHintUsed(true); }} onCorrect={() => setStars((value) => value + 1)} onNext={next} />
         )
       )}
       </>}
@@ -163,7 +164,7 @@ export function PlayApp({ activity, onBack, voiceAvailable = false }: { activity
   );
 }
 
-function QuizRound({ activityId, question, hintUsed, onHint, onCorrect, onNext, voiceAvailable }: { voiceAvailable: boolean; activityId: string; question: GeneratedQuestion; hintUsed: boolean; onHint: () => void; onCorrect: () => void; onNext: () => void }) {
+function QuizRound({ activityId, question, hintUsed, onHint, onCorrect, onNext, voiceAvailable, questionSpeech }: { voiceAvailable: boolean; activityId: string; question: GeneratedQuestion; hintUsed: boolean; onHint: () => void; onCorrect: () => void; onNext: () => void; questionSpeech?: (question: GeneratedQuestion) => string }) {
   const [choice, setChoice] = useState<string | null>(null);
   const correct = choice === question.answer;
   const choose = (value: string) => {
@@ -178,6 +179,7 @@ function QuizRound({ activityId, question, hintUsed, onHint, onCorrect, onNext, 
   return (
     <>
       <h2 className="game-question">{question.prompt}</h2>
+      {questionSpeech && <div className="hint-row"><button className="hint-button" type="button" onClick={() => speakMimo(questionSpeech(question))}>🔊 Hear Mimo again</button></div>}
       <div className="hint-row">
         {!hintUsed ? <button className="hint-button" type="button" onClick={onHint}>💡 Show a hint</button> : <p className="game-clue">💡 {question.hint}</p>}
       </div>

@@ -6,15 +6,17 @@ import { TWO_LETTER_WORDS } from "./literacy";
 import { recordVoice } from "../voice/record";
 import { coreClient } from "../app/coreClient";
 vi.mock("../camera/CameraPanel", () => ({ CameraPanel: () => <div>Camera preview</div> }));
-vi.mock("../components/mimo", () => ({ quietMimo: vi.fn(), reactMimo: vi.fn(), speakMimo: vi.fn() }));
+vi.mock("../components/mimo", () => ({ quietMimo: vi.fn(), reactMimo: vi.fn(), speakMimo: vi.fn(), clearMimoAnswer: vi.fn(), showMimoAnswer: vi.fn() }));
 vi.mock("../voice/record", () => ({ recordVoice: vi.fn() }));
 vi.mock("../setup/settings", () => ({ readSettings: () => ({ weeklyFocus: "oo", zones: [] }) }));
-afterEach(() => { cleanup(); vi.useRealTimers(); vi.restoreAllMocks(); });
-it.each(["air_writing", "sound_hunt", "co_reading", "letter_labels", "body_letters", "two_letter_words", "word_cards"])("opens and exits %s through the hub", activityId => {
+afterEach(() => { cleanup(); window.localStorage.clear(); vi.useRealTimers(); vi.restoreAllMocks(); });
+it.each(["air_writing", "sound_hunt", "co_reading", "letter_labels", "body_letters", "two_letter_words", "word_cards"])("opens %s inside ABC Play when its grown-up setting is on", activityId => {
+  window.localStorage.setItem(activityId === "letter_labels" || activityId === "word_cards" ? "jaitra-physical-letters" : "jaitra-advanced-input", "true");
   render(<Hub activities={[{ activityId, title: activityId, description: "Practice", icon: "A", availability: "AVAILABLE" }]} onPlayingChange={vi.fn()} homeRequest={0} />);
-  fireEvent.click(screen.getByRole("button", { name: `${activityId}, available` }));
+  fireEvent.click(screen.getByRole("button", { name: "ABC Play, available" }));
+  fireEvent.click(screen.getByRole("button", { name: /Practice/ }));
   fireEvent.click(screen.getByRole("button", { name: /Exit to home/ }));
-  expect(screen.getByRole("heading", { name: "Choose an app" })).toBeVisible();
+  expect(screen.getByRole("heading", { name: "ABC Play" })).toBeVisible();
 });
 it("opens Memory Match locally without requesting a generated question", () => {
   const getQuestion = vi.spyOn(coreClient, "getQuestion");
