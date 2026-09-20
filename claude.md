@@ -15,7 +15,8 @@ pushed in `d587b01`, reviewed by the user, and its full suites passed (83 core,
 The Phase C review is in
 `/home/jaitra/.codex/attachments/d161e2c8-291f-4607-aba3-849185a00aa4/pasted-text.txt`.
 
-Phase B adds six locally generated quizzes through the existing
+Phase B was pushed on `main` in `6eac6fb`. It adds six locally generated
+quizzes through the existing
 `GeneratedQuestion` and `PlayApp` pipeline: `rhyme_time`, `good_manners`,
 `counting_numbers`, `shapes_sorting`, `animal_sounds`, and `daily_routine`.
 They require only taps. The owner explicitly chose to retain the existing
