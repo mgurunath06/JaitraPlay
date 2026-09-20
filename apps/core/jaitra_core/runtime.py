@@ -227,7 +227,7 @@ class CoreRuntime:
             recent = list(dict.fromkeys([item.prompt for item in history] + request.recent_prompts))
             adapted = request.model_copy(update={"recent_prompts": recent})
             provider = self.provider_availability.available_provider
-            if provider is not None and request.topic is None:
+            if provider is not None:
                 try:
                     question = await self.questions.generate_with(provider, activity_id, adapted)
                     if repeats_question(question, history, recent):
